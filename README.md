@@ -13,7 +13,7 @@ DNS4M365 simplifies the process of retrieving, validating, and managing DNS reco
 - ✅ Monitoring DNS propagation in real-time across multiple resolvers
 - 📋 Retrieving Microsoft-generated DNS records (MX, CNAME, TXT, SRV)
 - 🔐 Automatic DKIM validation via Exchange Online PowerShell
-- 📊 CSV-based offline validation (no live API access required)
+- 📊 CSV/JSON-based offline validation (no live API access required)
 - 🛡️ DMARC policy generation (New-M365DmarcRecord cmdlet)
 - 🔒 MTA-STS validation for email encryption
 - 📈 Baseline/diff mode for change detection over time
@@ -25,7 +25,7 @@ DNS4M365 simplifies the process of retrieving, validating, and managing DNS reco
 
 - **DNS Compliance Validation**: Test-M365DnsCompliance validates actual DNS against expected values
 - **Automatic DKIM Validation**: Retrieves DKIM selectors from Exchange Online PowerShell
-- **CSV-Based Offline Validation**: Validate DNS without live API access (ideal for testing)
+- **CSV/JSON-Based Offline Validation**: Validate DNS without live API access (ideal for testing)
 - **DMARC Policy Generation**: New-M365DmarcRecord cmdlet creates compliant DMARC records
 - **MTA-STS Support**: Validates MTA-STS TXT records for email encryption enforcement
 - **Real-Time DNS Monitoring**: Watch-M365DnsPropagation tracks propagation across resolvers
@@ -57,7 +57,7 @@ DNS4M365 simplifies the process of retrieving, validating, and managing DNS reco
 
 #### Optional Dependencies
 The following modules are **ONLY** required if you use Graph API or Exchange Online features.
-**CSV-based validation requires NO external dependencies!**
+**CSV/JSON-based validation requires NO external dependencies!**
 
 - **OPTIONAL** - For Graph API features:
   - `Microsoft.Graph.Authentication` (v2.0.0+)
@@ -67,7 +67,7 @@ The following modules are **ONLY** required if you use Graph API or Exchange Onl
 
 ### Installation
 
-#### Option 1: CSV-Based Offline Validation (No Dependencies Required)
+#### Option 1: CSV/JSON-Based Offline Validation (No Dependencies Required)
 
 ```powershell
 # 1. Clone or download this repository
@@ -77,8 +77,9 @@ cd DNS4M365
 # 2. Import the module (no dependencies required!)
 Import-Module .\DNS4M365\DNS4M365.psd1
 
-# 3. Use CSV-based validation immediately
+# 3. Use CSV or JSON-based validation immediately
 Test-M365DnsCompliance -CSVPath ".\Templates\expected-dns-records-template.csv"
+Test-M365DnsCompliance -JSONPath ".\Templates\expected-dns-records-template.json"
 ```
 
 #### Option 2: Full Installation (Graph API + Exchange Online)
@@ -189,22 +190,26 @@ Connect-ExchangeOnline -CertificateThumbprint "YOUR_CERT_THUMBPRINT" `
                         -Organization "contoso.onmicrosoft.com"
 ```
 
-##### Method 3: CSV-Based Offline Validation (No Authentication Required)
+##### Method 3: CSV/JSON-Based Offline Validation (No Authentication Required)
 
 For scenarios where you don't have or don't want to use live API access:
 
 ```powershell
-# 1. Create CSV file with expected DNS records (see Templates/expected-dns-records-template.csv)
+# 1. Create CSV or JSON file with expected DNS records
+#    (see Templates/expected-dns-records-template.csv or .json)
 
 # 2. Run validation offline
 Test-M365DnsCompliance -CSVPath ".\expected-dns-records.csv"
+Test-M365DnsCompliance -JSONPath ".\expected-dns-records.json"
 
-# 3. Compare against CSV
+# 3. Compare against CSV/JSON
 Compare-M365DnsRecord -CSVPath ".\expected-dns-records.csv"
+Compare-M365DnsRecord -JSONPath ".\expected-dns-records.json"
 ```
 
-**Benefits of CSV Mode:**
+**Benefits of Offline Mode:**
 - No authentication required
+- Supports both CSV and JSON formats
 - Ideal for testing and validation scripts
 - Works in restricted environments
 - Reproducible validation (version-controlled expected values)

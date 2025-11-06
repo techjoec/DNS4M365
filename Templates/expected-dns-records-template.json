@@ -1,0 +1,82 @@
+[
+  {
+    "Domain": "contoso.com",
+    "RecordType": "MX",
+    "Label": "@",
+    "ExpectedValue": "contoso-com.mail.protection.outlook.com",
+    "TTL": 3600,
+    "Notes": "Exchange Online MX record (replace with your tenant-specific value)"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "TXT",
+    "Label": "@",
+    "ExpectedValue": "v=spf1 include:spf.protection.outlook.com -all",
+    "TTL": 3600,
+    "Notes": "SPF record for Exchange Online"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "CNAME",
+    "Label": "autodiscover",
+    "ExpectedValue": "autodiscover.outlook.com",
+    "TTL": 3600,
+    "Notes": "Exchange Autodiscover"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "CNAME",
+    "Label": "selector1._domainkey",
+    "ExpectedValue": "selector1-contoso-com._domainkey.contoso.onmicrosoft.com",
+    "TTL": 3600,
+    "Notes": "DKIM selector 1 (get actual value from Get-DkimSigningConfig)"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "CNAME",
+    "Label": "selector2._domainkey",
+    "ExpectedValue": "selector2-contoso-com._domainkey.contoso.onmicrosoft.com",
+    "TTL": 3600,
+    "Notes": "DKIM selector 2 (get actual value from Get-DkimSigningConfig)"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "CNAME",
+    "Label": "enterpriseregistration",
+    "ExpectedValue": "enterpriseregistration.windows.net",
+    "TTL": 3600,
+    "Notes": "Azure AD device registration"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "CNAME",
+    "Label": "enterpriseenrollment",
+    "ExpectedValue": "enterpriseenrollment-s.manage.microsoft.com",
+    "TTL": 3600,
+    "Notes": "Intune/MDM enrollment"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "SRV",
+    "Label": "_sipfederationtls._tcp",
+    "ExpectedValue": "100 1 5061 sipfed.online.lync.com",
+    "TTL": 3600,
+    "Notes": "Teams federation (only if federation enabled)"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "TXT",
+    "Label": "_dmarc",
+    "ExpectedValue": "v=DMARC1; p=quarantine; rua=mailto:dmarc@contoso.com",
+    "TTL": 3600,
+    "Notes": "DMARC policy (customize to your needs)"
+  },
+  {
+    "Domain": "contoso.com",
+    "RecordType": "TXT",
+    "Label": "_mta-sts",
+    "ExpectedValue": "v=STSv1; id=20250106T000000",
+    "TTL": 86400,
+    "Notes": "MTA-STS policy indicator"
+  }
+]

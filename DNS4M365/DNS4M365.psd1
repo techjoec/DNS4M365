@@ -18,14 +18,14 @@
     Copyright = '(c) 2025. All rights reserved.'
 
     # Description of the functionality provided by this module
-    Description = 'Comprehensive PowerShell module for Microsoft 365 DNS validation and monitoring. Validates DNS compliance against Microsoft Graph API and Exchange Online, monitors DNS propagation in real-time, and provides comprehensive health checks for M365 custom domains. Supports automatic DKIM validation, DMARC generation, MTA-STS validation, CSV-based offline validation (no dependencies required), DNS-over-HTTPS, baseline/diff mode, and multiple output formats.'
+    Description = 'Comprehensive PowerShell module for Microsoft 365 DNS validation and monitoring. Validates DNS compliance against Microsoft Graph API and Exchange Online, monitors DNS propagation in real-time, and provides comprehensive health checks for M365 custom domains. Supports automatic DKIM validation, DMARC generation, MTA-STS validation, CSV/JSON-based offline validation (no dependencies required), DNS-over-HTTPS, baseline/diff mode, and multiple output formats.'
 
     # Minimum version of the PowerShell engine required by this module
     PowerShellVersion = '5.1'
 
     # Modules that must be imported into the global environment prior to importing this module
     # NOTE: Dependencies are OPTIONAL - only required for Graph API/Exchange Online features.
-    #       CSV-based validation works without any external modules.
+    #       CSV/JSON-based offline validation works without any external modules.
     RequiredModules = @()
 
     # Functions to export from this module
@@ -56,7 +56,7 @@
 Version 1.3.0 (2025-01-06) - Exchange Online Integration & Enhanced Features:
 NEW FEATURES:
 - Automatic DKIM validation via Exchange Online PowerShell (Get-DkimSigningConfig)
-- CSV-based offline validation (validate without live API access - NO DEPENDENCIES REQUIRED!)
+- CSV/JSON-based offline validation (validate without live API access - NO DEPENDENCIES REQUIRED!)
 - New-M365DmarcRecord cmdlet for DMARC policy generation
 - MTA-STS validation support
 - Comprehensive permissions documentation in README
@@ -66,11 +66,12 @@ OPTIONAL DEPENDENCIES:
 - Microsoft.Graph.Identity.DirectoryManagement (v2.0.0+) - Only required for Graph API features
 - ExchangeOnlineManagement (v3.0.0+) - Only required for automatic DKIM validation
 
-CSV-BASED OFFLINE VALIDATION (NO DEPENDENCIES):
+CSV/JSON-BASED OFFLINE VALIDATION (NO DEPENDENCIES):
 - Works without any external modules installed
-- Use -CSVPath parameter with Test-M365DnsCompliance or Compare-M365DnsRecord
+- Use -CSVPath or -JSONPath parameter with Test-M365DnsCompliance or Compare-M365DnsRecord
+- Supports both CSV and JSON formats for maximum flexibility
 - Ideal for testing, restricted environments, or CI/CD pipelines
-- Template provided: Templates/expected-dns-records-template.csv
+- Templates provided: Templates/expected-dns-records-template.csv and .json
 
 Version 1.2.0 (2025-01-06) - KISS Architecture Simplification:
 BREAKING CHANGES:

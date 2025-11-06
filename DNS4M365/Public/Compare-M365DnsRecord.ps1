@@ -22,6 +22,13 @@ function Compare-M365DnsRecord {
         Path to CSV file containing expected DNS records for offline comparison.
         Use this to compare DNS without requiring live Microsoft Graph API access.
         See Templates/expected-dns-records-template.csv for format.
+        Mutually exclusive with -JSONPath.
+
+    .PARAMETER JSONPath
+        Path to JSON file containing expected DNS records for offline comparison.
+        Use this to compare DNS without requiring live Microsoft Graph API access.
+        See Templates/expected-dns-records-template.json for format.
+        Mutually exclusive with -CSVPath.
 
     .PARAMETER IncludeOptional
         Include optional DNS records in the comparison (DMARC, deprecated records).
@@ -60,6 +67,10 @@ function Compare-M365DnsRecord {
         Offline comparison using CSV file (no live API access required).
 
     .EXAMPLE
+        Compare-M365DnsRecord -JSONPath ".\Templates\expected-dns-records-template.json"
+        Offline comparison using JSON file (no live API access required).
+
+    .EXAMPLE
         Compare-M365DnsRecord -Name "contoso.com" -IncludeOptional -ShowOnlyDifference
         Shows only DNS records that have differences, including optional records.
 
@@ -79,10 +90,10 @@ function Compare-M365DnsRecord {
         Custom object array containing comparison results.
 
     .NOTES
-        Requires Microsoft Graph connection with Domain.Read.All scope (unless using CSV).
+        Requires Microsoft Graph connection with Domain.Read.All scope (unless using CSV/JSON).
         Run: Connect-MgGraph -Scopes "Domain.Read.All"
 
-        CSV-based comparison does not require any authentication (offline mode).
+        CSV/JSON-based comparison does not require any authentication (offline mode).
     #>
 
     [CmdletBinding(DefaultParameterSetName = 'Compare')]
@@ -103,6 +114,18 @@ function Compare-M365DnsRecord {
             $true
         })]
         [string]$CSVPath,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            if (-not (Test-Path $_)) {
+                throw "JSON file not found: $_"
+            }
+            if ($_ -notlike "*.json") {
+                throw "File must be a JSON file"
+            }
+            $true
+        })]
+        [string]$JSONPath,
 
         [Parameter(Mandatory = $false)]
         [switch]$IncludeOptional,
@@ -137,18 +160,38 @@ function Compare-M365DnsRecord {
     begin {
         Write-Verbose "Starting DNS comparison"
 
-        # Determine comparison mode
+        # Check for mutual exclusivity
         $usingCSV = $PSBoundParameters.ContainsKey('CSVPath')
-        $csvRecords = $null
+        $usingJSON = $PSBoundParameters.ContainsKey('JSONPath')
+
+        if ($usingCSV -and $usingJSON) {
+            throw "Cannot specify both -CSVPath and -JSONPath. Please use only one offline comparison method."
+        }
+
+        # Determine comparison mode
+        $offlineRecords = $null
+        $usingOffline = $usingCSV -or $usingJSON
 
         if ($usingCSV) {
             Write-Verbose "Using CSV-based offline comparison mode"
             try {
-                $csvRecords = Import-Csv -Path $CSVPath
-                Write-Verbose "Loaded $($csvRecords.Count) records from CSV"
+                $offlineRecords = Import-Csv -Path $CSVPath
+                Write-Verbose "Loaded $($offlineRecords.Count) records from CSV"
             }
             catch {
                 throw "Failed to import CSV file: $_"
+            }
+        }
+        elseif ($usingJSON) {
+            Write-Verbose "Using JSON-based offline comparison mode"
+            try {
+                $jsonContent = Get-Content -Path $JSONPath -Raw | ConvertFrom-Json
+                # Convert to array if single object
+                $offlineRecords = if ($jsonContent -is [array]) { $jsonContent } else { @($jsonContent) }
+                Write-Verbose "Loaded $($offlineRecords.Count) records from JSON"
+            }
+            catch {
+                throw "Failed to import JSON file: $_"
             }
         }
         else {
@@ -167,9 +210,10 @@ OPTION 1: Install Microsoft Graph modules (for Graph API comparison):
     Install-Module Microsoft.Graph.Identity.DirectoryManagement -MinimumVersion 2.0.0 -Scope CurrentUser
     Connect-MgGraph -Scopes 'Domain.Read.All'
 
-OPTION 2: Use CSV-based offline comparison (no dependencies required):
+OPTION 2: Use CSV/JSON-based offline comparison (no dependencies required):
     Compare-M365DnsRecord -CSVPath ".\expected-dns-records.csv"
-    (See Templates/expected-dns-records-template.csv for format)
+    Compare-M365DnsRecord -JSONPath ".\expected-dns-records.json"
+    (See Templates/ for template files)
 
 OPTION 3: Use baseline comparison (no dependencies required):
     Compare-M365DnsRecord -CompareToBaseline -BaselinePath ".\baseline.json"
@@ -211,10 +255,11 @@ OPTION 3: Use baseline comparison (no dependencies required):
                     # Get domains from baseline
                     $Name = $baseline.Domain | Select-Object -Unique
                 }
-                elseif ($usingCSV) {
-                    # Get domains from CSV
-                    $Name = $csvRecords | Select-Object -ExpandProperty Domain -Unique
-                    Write-Verbose "Found $($Name.Count) unique domain(s) in CSV"
+                elseif ($usingOffline) {
+                    # Get domains from CSV/JSON
+                    $Name = $offlineRecords | Select-Object -ExpandProperty Domain -Unique
+                    $sourceType = if ($usingCSV) { "CSV" } else { "JSON" }
+                    Write-Verbose "Found $($Name.Count) unique domain(s) in $sourceType"
                 }
                 else {
                     Write-Verbose "No domain specified, retrieving all verified domains"
@@ -231,12 +276,13 @@ OPTION 3: Use baseline comparison (no dependencies required):
                     Write-Verbose "Using baseline as expected state"
                     $expectedRecords = $baseline | Where-Object { $_.Domain -eq $domain }
                 }
-                elseif ($usingCSV) {
-                    Write-Verbose "Loading expected DNS records from CSV for $domain"
-                    $expectedRecords = $csvRecords | Where-Object { $_.Domain -eq $domain }
+                elseif ($usingOffline) {
+                    $sourceType = if ($usingCSV) { "CSV" } else { "JSON" }
+                    Write-Verbose "Loading expected DNS records from $sourceType for $domain"
+                    $expectedRecords = $offlineRecords | Where-Object { $_.Domain -eq $domain }
 
                     if (-not $expectedRecords) {
-                        Write-Warning "No records found for $domain in CSV file"
+                        Write-Warning "No records found for $domain in $sourceType file"
                         continue
                     }
                 }
@@ -252,7 +298,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
 
                 foreach ($record in $expectedRecords) {
                     # Extract record type and label based on source
-                    if ($usingCSV) {
+                    if ($usingOffline) {
                         $recordType = $record.RecordType
                         $label = $record.Label
                     }
@@ -275,9 +321,9 @@ OPTION 3: Use baseline comparison (no dependencies required):
                         ExpectedValue   = $null
                         ActualValue     = $null
                         Status          = "Unknown"
-                        SupportedService = if ($usingCSV) { $record.Notes } elseif ($CompareToBaseline) { $record.SupportedService } else { $record.SupportedService }
-                        IsOptional      = if ($usingCSV) { $false } elseif ($CompareToBaseline) { $record.IsOptional } else { $record.IsOptional }
-                        TTL             = if ($usingCSV) { $record.TTL } elseif ($CompareToBaseline) { $record.TTL } else { $record.Ttl }
+                        SupportedService = if ($usingOffline) { $record.Notes } elseif ($CompareToBaseline) { $record.SupportedService } else { $record.SupportedService }
+                        IsOptional      = if ($usingOffline) { $false } elseif ($CompareToBaseline) { $record.IsOptional } else { $record.IsOptional }
+                        TTL             = if ($usingOffline) { $record.TTL } elseif ($CompareToBaseline) { $record.TTL } else { $record.Ttl }
                         Details         = $null
                     }
 
@@ -290,7 +336,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
                     # Get expected value based on record type
                     switch ($recordType) {
                         'MX' {
-                            if ($usingCSV) {
+                            if ($usingOffline) {
                                 $comparison.ExpectedValue = $record.ExpectedValue
                             }
                             elseif ($CompareToBaseline) {
@@ -306,8 +352,8 @@ OPTION 3: Use baseline comparison (no dependencies required):
                                     $primaryMX = $actual | Sort-Object Preference | Select-Object -First 1
                                     $comparison.ActualValue = "$($primaryMX.Preference) $($primaryMX.NameExchange)"
 
-                                    if ($usingCSV -or $CompareToBaseline) {
-                                        # For CSV/baseline, extract hostname from "priority hostname" format
+                                    if ($usingOffline -or $CompareToBaseline) {
+                                        # For CSV/JSON/baseline, extract hostname from "priority hostname" format
                                         $expectedMX = if ($record.ExpectedValue -match '\d+\s+(.+)') { $Matches[1] } else { $record.ExpectedValue }
                                     }
                                     else {
@@ -339,7 +385,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
                         }
 
                         'CName' {
-                            if ($usingCSV) {
+                            if ($usingOffline) {
                                 $comparison.ExpectedValue = $record.ExpectedValue
                                 $expectedCName = $record.ExpectedValue
                             }
@@ -387,7 +433,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
                         }
 
                         'Txt' {
-                            if ($usingCSV) {
+                            if ($usingOffline) {
                                 $comparison.ExpectedValue = $record.ExpectedValue
                                 $expectedText = $record.ExpectedValue
                             }
@@ -426,7 +472,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
                         }
 
                         'Srv' {
-                            if ($usingCSV -or $CompareToBaseline) {
+                            if ($usingOffline -or $CompareToBaseline) {
                                 $comparison.FQDN = $record.FQDN
                                 $comparison.ExpectedValue = $record.ExpectedValue
                                 $srvFqdn = $record.FQDN
