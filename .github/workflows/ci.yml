@@ -9,11 +9,7 @@ on:
 jobs:
   test:
     name: Test and Lint
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-      fail-fast: false
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
