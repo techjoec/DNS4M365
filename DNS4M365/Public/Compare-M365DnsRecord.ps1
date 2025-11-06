@@ -155,9 +155,36 @@ function Compare-M365DnsRecord {
             # Check Microsoft Graph connection (unless comparing to baseline only)
             if (-not $CompareToBaseline) {
                 Write-Verbose "Using online comparison mode (Microsoft Graph API)"
-                $context = Get-MgContext
-                if (-not $context) {
-                    throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
+
+                # Check if Microsoft.Graph.Authentication module is available
+                $graphAuthModule = Get-Module -ListAvailable -Name Microsoft.Graph.Authentication | Select-Object -First 1
+                if (-not $graphAuthModule) {
+                    throw @"
+Microsoft Graph module not installed.
+
+OPTION 1: Install Microsoft Graph modules (for Graph API comparison):
+    Install-Module Microsoft.Graph.Authentication -MinimumVersion 2.0.0 -Scope CurrentUser
+    Install-Module Microsoft.Graph.Identity.DirectoryManagement -MinimumVersion 2.0.0 -Scope CurrentUser
+    Connect-MgGraph -Scopes 'Domain.Read.All'
+
+OPTION 2: Use CSV-based offline comparison (no dependencies required):
+    Compare-M365DnsRecord -CSVPath ".\expected-dns-records.csv"
+    (See Templates/expected-dns-records-template.csv for format)
+
+OPTION 3: Use baseline comparison (no dependencies required):
+    Compare-M365DnsRecord -CompareToBaseline -BaselinePath ".\baseline.json"
+"@
+                }
+
+                # Check Graph connection
+                try {
+                    $context = Get-MgContext
+                    if (-not $context) {
+                        throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
+                    }
+                }
+                catch {
+                    throw "Microsoft Graph connection error: $_`n`nPlease connect: Connect-MgGraph -Scopes 'Domain.Read.All'"
                 }
             }
         }

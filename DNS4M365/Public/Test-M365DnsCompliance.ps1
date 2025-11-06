@@ -183,27 +183,67 @@ function Test-M365DnsCompliance {
             }
         }
         else {
-            # Check Microsoft Graph connection (required for online validation)
+            # Check Microsoft Graph module availability (required for online validation)
             Write-Verbose "Using online validation mode (Microsoft Graph API)"
-            $context = Get-MgContext
-            if (-not $context) {
-                throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
+
+            # Check if Microsoft.Graph.Authentication module is available
+            $graphAuthModule = Get-Module -ListAvailable -Name Microsoft.Graph.Authentication | Select-Object -First 1
+            if (-not $graphAuthModule) {
+                throw @"
+Microsoft Graph module not installed.
+
+OPTION 1: Install Microsoft Graph modules (for Graph API validation):
+    Install-Module Microsoft.Graph.Authentication -MinimumVersion 2.0.0 -Scope CurrentUser
+    Install-Module Microsoft.Graph.Identity.DirectoryManagement -MinimumVersion 2.0.0 -Scope CurrentUser
+    Connect-MgGraph -Scopes 'Domain.Read.All'
+
+OPTION 2: Use CSV-based offline validation (no dependencies required):
+    Test-M365DnsCompliance -CSVPath ".\expected-dns-records.csv"
+    (See Templates/expected-dns-records-template.csv for format)
+"@
+            }
+
+            # Check Graph connection
+            try {
+                $context = Get-MgContext
+                if (-not $context) {
+                    throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
+                }
+            }
+            catch {
+                throw "Microsoft Graph connection error: $_`n`nPlease connect: Connect-MgGraph -Scopes 'Domain.Read.All'"
             }
         }
 
         # Check Exchange Online connection if DKIM validation with Exchange requested
         if ($UseExchangeOnline -and $CheckDKIM) {
             Write-Verbose "Checking Exchange Online connection for DKIM validation"
-            try {
-                $exoSession = Get-PSSession | Where-Object { $_.ConfigurationName -eq 'Microsoft.Exchange' -and $_.State -eq 'Opened' }
-                if (-not $exoSession) {
-                    Write-Warning "Exchange Online not connected. DKIM validation will use Graph API records only. Run: Connect-ExchangeOnline"
+
+            # Check if ExchangeOnlineManagement module is available
+            $exoModule = Get-Module -ListAvailable -Name ExchangeOnlineManagement | Select-Object -First 1
+            if (-not $exoModule) {
+                Write-Warning @"
+ExchangeOnlineManagement module not installed. DKIM validation will use Graph API records only.
+
+To enable automatic DKIM validation via Exchange Online PowerShell:
+    Install-Module ExchangeOnlineManagement -MinimumVersion 3.0.0 -Scope CurrentUser
+    Connect-ExchangeOnline
+"@
+                $UseExchangeOnline = $false
+            }
+            else {
+                # Check connection
+                try {
+                    $exoSession = Get-PSSession | Where-Object { $_.ConfigurationName -eq 'Microsoft.Exchange' -and $_.State -eq 'Opened' }
+                    if (-not $exoSession) {
+                        Write-Warning "Exchange Online not connected. DKIM validation will use Graph API records only. Run: Connect-ExchangeOnline"
+                        $UseExchangeOnline = $false
+                    }
+                }
+                catch {
+                    Write-Warning "Could not verify Exchange Online connection: $_"
                     $UseExchangeOnline = $false
                 }
-            }
-            catch {
-                Write-Warning "Could not verify Exchange Online connection: $_"
-                $UseExchangeOnline = $false
             }
         }
 

@@ -52,16 +52,36 @@ DNS4M365 simplifies the process of retrieving, validating, and managing DNS reco
 
 ### Prerequisites
 
-- PowerShell 5.1 or higher
-- Microsoft Graph PowerShell SDK modules:
+#### Required
+- **PowerShell 5.1 or higher** (REQUIRED for all features)
+
+#### Optional Dependencies
+The following modules are **ONLY** required if you use Graph API or Exchange Online features.
+**CSV-based validation requires NO external dependencies!**
+
+- **OPTIONAL** - For Graph API features:
   - `Microsoft.Graph.Authentication` (v2.0.0+)
   - `Microsoft.Graph.Identity.DirectoryManagement` (v2.0.0+)
-- Exchange Online PowerShell module (for automatic DKIM validation):
+- **OPTIONAL** - For automatic DKIM validation:
   - `ExchangeOnlineManagement` (v3.0.0+)
 
 ### Installation
 
-#### Install Prerequisites
+#### Option 1: CSV-Based Offline Validation (No Dependencies Required)
+
+```powershell
+# 1. Clone or download this repository
+git clone https://github.com/yourusername/DNS4M365.git
+cd DNS4M365
+
+# 2. Import the module (no dependencies required!)
+Import-Module .\DNS4M365\DNS4M365.psd1
+
+# 3. Use CSV-based validation immediately
+Test-M365DnsCompliance -CSVPath ".\Templates\expected-dns-records-template.csv"
+```
+
+#### Option 2: Full Installation (Graph API + Exchange Online)
 
 ```powershell
 # Install Microsoft Graph PowerShell modules
