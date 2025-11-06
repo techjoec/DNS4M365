@@ -88,6 +88,12 @@ function Watch-M365DnsPropagation {
         [int]$Duration,
 
         [Parameter(Mandatory = $false)]
+        [ArgumentCompleter({
+            param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+            @('8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1', '9.9.9.9', '149.112.112.112', '208.67.222.222', '208.67.220.220') |
+                Where-Object { $_ -like "$wordToComplete*" } |
+                ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+        })]
         [string[]]$Resolver = @('8.8.8.8', '1.1.1.1', '9.9.9.9'),
 
         [Parameter(Mandatory = $false)]
@@ -180,12 +186,12 @@ function Watch-M365DnsPropagation {
                         # Check for changes
                         if ($previousValues[$server] -and $previousValues[$server] -ne $value) {
                             $changeCount++
-                            Write-Information "  ⚠️  CHANGE DETECTED on $server" -InformationAction Continue
+                            Write-Information "  [CHANGE] CHANGE DETECTED on $server" -InformationAction Continue
                             Write-Information "      Old: $($previousValues[$server])" -InformationAction Continue
                             Write-Information "      New: $value" -InformationAction Continue
                         }
                         elseif (-not $Quiet) {
-                            $status = if ($value) { "✓" } else { "✗" }
+                            $status = if ($value) { "[OK]" } else { "[FAILED]" }
                             Write-Information "  $status $server : $value" -InformationAction Continue
                         }
 
@@ -201,7 +207,7 @@ function Watch-M365DnsPropagation {
                     catch {
                         Write-Verbose "Failed to query $server : $_"
                         if (-not $Quiet) {
-                            Write-Information "  ✗ $server : Query failed" -InformationAction Continue
+                            Write-Information "  [FAILED] $server : Query failed" -InformationAction Continue
                         }
                     }
                 }
@@ -214,14 +220,14 @@ function Watch-M365DnsPropagation {
                         Write-Information "`n  Propagation: $propagationPct% ($matchExpected/$($Resolver.Count) resolvers)" -InformationAction Continue
                     }
                     else {
-                        Write-Information "`n  ✓ Propagation: 100% (All resolvers match expected value!)" -InformationAction Continue
+                        Write-Information "`n  [SUCCESS] Propagation: 100% (All resolvers match expected value!)" -InformationAction Continue
                         $allMatch = $true
                     }
                 }
 
                 # Exit if all match expected (and expected was provided)
                 if ($ExpectedValue -and $allMatch) {
-                    Write-Information "`n🎉 DNS propagation complete! All resolvers now return the expected value." -InformationAction Continue
+                    Write-Information "`n[SUCCESS] DNS propagation complete! All resolvers now return the expected value." -InformationAction Continue
                     break
                 }
 
@@ -246,10 +252,10 @@ function Watch-M365DnsPropagation {
             Write-Information "Duration: $($totalDuration.ToString('hh\:mm\:ss'))" -InformationAction Continue
 
             if ($ExpectedValue -and $allMatch) {
-                Write-Information "Status: ✓ Propagation Complete" -InformationAction Continue
+                Write-Information "Status: [SUCCESS] Propagation Complete" -InformationAction Continue
             }
             elseif ($ExpectedValue) {
-                Write-Information "Status: ⚠️  Still Propagating" -InformationAction Continue
+                Write-Information "Status: [WARNING] Still Propagating" -InformationAction Continue
             }
             else {
                 Write-Information "Status: Monitoring Stopped" -InformationAction Continue

@@ -279,7 +279,7 @@ function New-M365DmarcRecord {
                 Write-Information "  4. Monitor aggregate reports for 2-4 weeks" -InformationAction Continue
 
                 if ($Policy -eq 'none') {
-                    Write-Information "`n  ⚠️  Monitoring Mode: After reviewing reports, consider p=quarantine" -InformationAction Continue
+                    Write-Information "`n  [WARNING] Monitoring Mode: After reviewing reports, consider p=quarantine" -InformationAction Continue
                 }
 
                 Write-Information "`nValidation Tools:" -InformationAction Continue
