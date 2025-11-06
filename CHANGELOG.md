@@ -5,6 +5,35 @@ All notable changes to the DNS4M365 project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Comprehensive Pester test suite with 15 tests covering module structure, imports, and code quality
+- Tab completion support for DNS server parameters (ArgumentCompleter)
+  - `Compare-M365DnsRecord -Server <tab>`
+  - `Test-M365DnsCompliance -Server <tab>`
+  - `Watch-M365DnsPropagation -Resolver <tab>`
+  - Suggests common public DNS servers (Google, Cloudflare, Quad9, OpenDNS)
+
+### Fixed
+- Syntax error in `Compare-M365DnsRecord` function (variable interpolation with colons)
+- Empty catch block in `Compare-M365DnsRecord` now includes explanation
+- Automatic variable conflict: renamed `$matches` to `$matchCount`
+- Removed unused variables (`$healthColor`, `$valuesMatch`)
+
+### Changed
+- Replaced all `Write-Host` calls with `Write-Information` (94 occurrences) for better PowerShell practices
+- Replaced Unicode emoji with ASCII equivalents for cross-platform compatibility
+  - ⚠️ → [WARNING]
+  - ✓ → [OK] or [SUCCESS]
+  - ✗ → [FAILED]
+  - 🎉 → [SUCCESS]
+
+### Code Quality
+- All PSScriptAnalyzer critical warnings resolved
+- 0 errors, 0 critical warnings
+- All cmdlet verbs comply with PowerShell standards
+
 ## [1.1.0] - 2025-01-06
 
 ### Added

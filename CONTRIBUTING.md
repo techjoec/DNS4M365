@@ -342,15 +342,33 @@ Get-M365DomainDNSRecord
 # ... etc
 ```
 
-### Future: Pester Tests
+### Running Tests
 
-We plan to add Pester tests. When implemented:
+The module includes comprehensive Pester tests:
+
 ```powershell
 # Run all tests
-Invoke-Pester
+Invoke-Pester -Path .\Tests\DNS4M365.Tests.ps1
 
-# Run specific test
-Invoke-Pester -Path .\Tests\Get-M365Domain.Tests.ps1
+# Run with detailed output
+Invoke-Pester -Path .\Tests\DNS4M365.Tests.ps1 -Output Detailed
+
+# Run specific test context
+Invoke-Pester -Path .\Tests\DNS4M365.Tests.ps1 -TagFilter 'Module'
+```
+
+### Running Lints
+
+Use PSScriptAnalyzer to check code quality:
+
+```powershell
+# Lint all public functions
+Get-ChildItem -Path .\DNS4M365\Public -Filter *.ps1 |
+    ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName }
+
+# Check for errors only
+Get-ChildItem -Path .\DNS4M365\Public -Filter *.ps1 |
+    ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error }
 ```
 
 ## Documentation
