@@ -69,6 +69,7 @@ Version 1.1.0 (2025-01-06):
 - Added Teams-only vs hybrid Skype for Business detection
 - Enhanced comparison function with format detection and recommendations
 - Overall DNS compliance scoring and action priority assignment
+- DNS-over-HTTPS support using Google Public DNS for consistent DNS lookups
 
 Version 1.0.0 (2025-01-05):
 - Initial release - Domain enumeration and DNS record retrieval functionality

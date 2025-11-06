@@ -115,7 +115,7 @@ function Compare-M365DomainDNS {
                             $comparison.ExpectedValue = "$($record.AdditionalProperties['preference']) $($record.AdditionalProperties['mailExchange'])"
 
                             try {
-                                $actual = Resolve-DnsName -Name $fqdn -Type MX -ErrorAction SilentlyContinue
+                                $actual = Resolve-DnsOverHttps -Name $fqdn -Type MX -ErrorAction SilentlyContinue
                                 if ($actual) {
                                     $primaryMX = $actual | Sort-Object Preference | Select-Object -First 1
                                     $comparison.ActualValue = "$($primaryMX.Preference) $($primaryMX.NameExchange)"
@@ -148,7 +148,7 @@ function Compare-M365DomainDNS {
                             $comparison.ExpectedValue = $record.AdditionalProperties['canonicalName']
 
                             try {
-                                $actual = Resolve-DnsName -Name $fqdn -Type CNAME -ErrorAction SilentlyContinue
+                                $actual = Resolve-DnsOverHttps -Name $fqdn -Type CNAME -ErrorAction SilentlyContinue
                                 if ($actual) {
                                     $comparison.ActualValue = $actual.NameHost
 
@@ -185,7 +185,7 @@ function Compare-M365DomainDNS {
                             $comparison.ExpectedValue = $record.AdditionalProperties['text']
 
                             try {
-                                $actual = Resolve-DnsName -Name $fqdn -Type TXT -ErrorAction SilentlyContinue
+                                $actual = Resolve-DnsOverHttps -Name $fqdn -Type TXT -ErrorAction SilentlyContinue
                                 if ($actual) {
                                     $txtValue = ($actual.Strings -join "")
                                     $comparison.ActualValue = $txtValue
@@ -225,7 +225,7 @@ function Compare-M365DomainDNS {
                             $comparison.ExpectedValue = "$priority $weight $port $target"
 
                             try {
-                                $actual = Resolve-DnsName -Name $srvFqdn -Type SRV -ErrorAction SilentlyContinue
+                                $actual = Resolve-DnsOverHttps -Name $srvFqdn -Type SRV -ErrorAction SilentlyContinue
                                 if ($actual) {
                                     $comparison.ActualValue = "$($actual.Priority) $($actual.Weight) $($actual.Port) $($actual.NameTarget)"
 
@@ -257,7 +257,7 @@ function Compare-M365DomainDNS {
                     # Check DMARC
                     Write-Verbose "Checking DMARC record (MANDATORY starting April 2025)"
                     try {
-                        $dmarc = Resolve-DnsName -Name "_dmarc.$domain" -Type TXT -ErrorAction SilentlyContinue
+                        $dmarc = Resolve-DnsOverHttps -Name "_dmarc.$domain" -Type TXT -ErrorAction SilentlyContinue
                         $dmarcComparison = [PSCustomObject]@{
                             Domain = $domain
                             RecordType = "TXT"
@@ -280,7 +280,7 @@ function Compare-M365DomainDNS {
                     # Check for deprecated MSOID
                     Write-Verbose "Checking for deprecated MSOID record"
                     try {
-                        $msoid = Resolve-DnsName -Name "msoid.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                        $msoid = Resolve-DnsOverHttps -Name "msoid.$domain" -Type CNAME -ErrorAction SilentlyContinue
                         if ($msoid) {
                             $msoidComparison = [PSCustomObject]@{
                                 Domain = $domain

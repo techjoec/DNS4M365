@@ -27,6 +27,7 @@ DNS4M365 simplifies the process of retrieving and managing DNS records for Micro
 - **Health Checks**: Test domain verification status and configuration
 - **Report Generation**: Export data to CSV, JSON, or HTML formats
 - **Pipeline Support**: Full PowerShell pipeline compatibility
+- **DNS-over-HTTPS**: Consistent DNS lookups using Google Public DNS (independent of local resolver configuration)
 
 ### Record Types Supported
 
@@ -124,6 +125,7 @@ This guide covers:
 - **Deprecated Records:** Enhanced detection for msoid and legacy Skype for Business CNAMEs
 - **Regional Cloud Support:** Improved detection for GCC High, DoD, and 21Vianet
 - **Teams-Only Detection:** Identifies legacy Skype for Business records not needed for Teams
+- **DNS-over-HTTPS:** All DNS lookups use Google Public DNS for consistent, reliable results
 
 ### Available Commands
 

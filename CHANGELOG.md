@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### DNS-over-HTTPS Support
+- All DNS lookups now use Google Public DNS-over-HTTPS API
+- Consistent DNS resolution results independent of local resolver configuration
+- More reliable lookups compared to local DNS resolvers
+- Private helper function: `Resolve-DnsOverHttps` for internal use
+- Supports all record types: MX, CNAME, TXT, SRV, A, AAAA
+
 #### New Function: Get-M365DomainReadiness
 - Comprehensive DNS compliance assessment for 2024-2025 Microsoft 365 DNS updates
 - Evaluates MX record format (legacy `mail.protection.outlook.com` vs modern `mx.microsoft`)

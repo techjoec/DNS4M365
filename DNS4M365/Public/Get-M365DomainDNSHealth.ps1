@@ -118,7 +118,7 @@ function Get-M365DomainDNSHealth {
                 # Check MX Record
                 Write-Verbose "Checking MX record for $domain"
                 try {
-                    $mxRecords = Resolve-DnsName -Name $domain -Type MX -ErrorAction SilentlyContinue
+                    $mxRecords = Resolve-DnsOverHttps -Name $domain -Type MX -ErrorAction SilentlyContinue
                     if ($mxRecords) {
                         $primaryMX = $mxRecords | Sort-Object Preference | Select-Object -First 1
 
@@ -163,7 +163,7 @@ function Get-M365DomainDNSHealth {
                 # Check Autodiscover CNAME
                 Write-Verbose "Checking Autodiscover CNAME for $domain"
                 try {
-                    $autodiscover = Resolve-DnsName -Name "autodiscover.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                    $autodiscover = Resolve-DnsOverHttps -Name "autodiscover.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($autodiscover) {
                         $domainHealth.AutodiscoverCNAME = [PSCustomObject]@{
                             Exists = $true
@@ -189,7 +189,7 @@ function Get-M365DomainDNSHealth {
                 if ($IncludeSPF) {
                     Write-Verbose "Checking SPF record for $domain"
                     try {
-                        $txtRecords = Resolve-DnsName -Name $domain -Type TXT -ErrorAction SilentlyContinue
+                        $txtRecords = Resolve-DnsOverHttps -Name $domain -Type TXT -ErrorAction SilentlyContinue
                         $spfRecord = $txtRecords | Where-Object { $_.Strings -like "v=spf1*" } | Select-Object -First 1
 
                         if ($spfRecord) {
@@ -231,7 +231,7 @@ function Get-M365DomainDNSHealth {
                 if ($IncludeDMARC) {
                     Write-Verbose "Checking DMARC record for $domain"
                     try {
-                        $dmarcRecord = Resolve-DnsName -Name "_dmarc.$domain" -Type TXT -ErrorAction SilentlyContinue
+                        $dmarcRecord = Resolve-DnsOverHttps -Name "_dmarc.$domain" -Type TXT -ErrorAction SilentlyContinue
 
                         if ($dmarcRecord) {
                             $dmarcText = $dmarcRecord.Strings -join ""
@@ -270,8 +270,8 @@ function Get-M365DomainDNSHealth {
                         $selector1Host = "selector1._domainkey.$domain"
                         $selector2Host = "selector2._domainkey.$domain"
 
-                        $selector1 = Resolve-DnsName -Name $selector1Host -Type CNAME -ErrorAction SilentlyContinue
-                        $selector2 = Resolve-DnsName -Name $selector2Host -Type CNAME -ErrorAction SilentlyContinue
+                        $selector1 = Resolve-DnsOverHttps -Name $selector1Host -Type CNAME -ErrorAction SilentlyContinue
+                        $selector2 = Resolve-DnsOverHttps -Name $selector2Host -Type CNAME -ErrorAction SilentlyContinue
 
                         # Detect DKIM format (legacy vs new May 2025 format)
                         $isLegacyFormat1 = if ($selector1) { $selector1.NameHost -like "*._domainkey.*.onmicrosoft.com" } else { $false }
@@ -317,7 +317,7 @@ function Get-M365DomainDNSHealth {
                     Write-Verbose "Checking Teams/SfB SRV records for $domain"
 
                     try {
-                        $sipTLS = Resolve-DnsName -Name "_sip._tls.$domain" -Type SRV -ErrorAction SilentlyContinue
+                        $sipTLS = Resolve-DnsOverHttps -Name "_sip._tls.$domain" -Type SRV -ErrorAction SilentlyContinue
                         if ($sipTLS) {
                             $domainHealth.SIPTLSSRVRecord = [PSCustomObject]@{
                                 Exists = $true
@@ -344,7 +344,7 @@ function Get-M365DomainDNSHealth {
                     }
 
                     try {
-                        $sipFed = Resolve-DnsName -Name "_sipfederationtls._tcp.$domain" -Type SRV -ErrorAction SilentlyContinue
+                        $sipFed = Resolve-DnsOverHttps -Name "_sipfederationtls._tcp.$domain" -Type SRV -ErrorAction SilentlyContinue
                         if ($sipFed) {
                             $domainHealth.SIPFederationSRVRecord = [PSCustomObject]@{
                                 Exists = $true
@@ -369,7 +369,7 @@ function Get-M365DomainDNSHealth {
 
                     # Check SIP CNAME
                     try {
-                        $sip = Resolve-DnsName -Name "sip.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                        $sip = Resolve-DnsOverHttps -Name "sip.$domain" -Type CNAME -ErrorAction SilentlyContinue
                         if ($sip) {
                             $domainHealth.SIPRecord = [PSCustomObject]@{
                                 Exists = $true
@@ -390,7 +390,7 @@ function Get-M365DomainDNSHealth {
 
                     # Check lyncdiscover CNAME
                     try {
-                        $lyncdiscover = Resolve-DnsName -Name "lyncdiscover.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                        $lyncdiscover = Resolve-DnsOverHttps -Name "lyncdiscover.$domain" -Type CNAME -ErrorAction SilentlyContinue
                         if ($lyncdiscover) {
                             $domainHealth.LyncdiscoverRecord = [PSCustomObject]@{
                                 Exists = $true
@@ -414,7 +414,7 @@ function Get-M365DomainDNSHealth {
                 if ($CheckDeprecated) {
                     Write-Verbose "Checking for deprecated msoid record"
                     try {
-                        $msoid = Resolve-DnsName -Name "msoid.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                        $msoid = Resolve-DnsOverHttps -Name "msoid.$domain" -Type CNAME -ErrorAction SilentlyContinue
                         if ($msoid) {
                             $domainHealth.DeprecatedMSOID = [PSCustomObject]@{
                                 Exists = $true
@@ -434,7 +434,7 @@ function Get-M365DomainDNSHealth {
 
                 # Check Intune/MDM records
                 try {
-                    $enterpriseEnroll = Resolve-DnsName -Name "enterpriseenrollment.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                    $enterpriseEnroll = Resolve-DnsOverHttps -Name "enterpriseenrollment.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($enterpriseEnroll) {
                         $domainHealth.EnterpriseEnrollment = [PSCustomObject]@{
                             Exists = $true
@@ -446,7 +446,7 @@ function Get-M365DomainDNSHealth {
                         $domainHealth.EnterpriseEnrollment = [PSCustomObject]@{ Exists = $false }
                     }
 
-                    $enterpriseReg = Resolve-DnsName -Name "enterpriseregistration.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                    $enterpriseReg = Resolve-DnsOverHttps -Name "enterpriseregistration.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($enterpriseReg) {
                         $domainHealth.EnterpriseRegistration = [PSCustomObject]@{
                             Exists = $true

@@ -111,7 +111,7 @@ function Get-M365DomainReadiness {
                 # 1. Check MX Record Format
                 Write-Verbose "Checking MX record format for $domain"
                 try {
-                    $mxRecords = Resolve-DnsName -Name $domain -Type MX -ErrorAction SilentlyContinue
+                    $mxRecords = Resolve-DnsOverHttps -Name $domain -Type MX -ErrorAction SilentlyContinue
                     if ($mxRecords) {
                         $primaryMX = $mxRecords | Sort-Object Preference | Select-Object -First 1
 
@@ -155,8 +155,8 @@ function Get-M365DomainReadiness {
                 # 2. Check DKIM Format
                 Write-Verbose "Checking DKIM configuration for $domain"
                 try {
-                    $selector1 = Resolve-DnsName -Name "selector1._domainkey.$domain" -Type CNAME -ErrorAction SilentlyContinue
-                    $selector2 = Resolve-DnsName -Name "selector2._domainkey.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                    $selector1 = Resolve-DnsOverHttps -Name "selector1._domainkey.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                    $selector2 = Resolve-DnsOverHttps -Name "selector2._domainkey.$domain" -Type CNAME -ErrorAction SilentlyContinue
 
                     $hasSelector1 = $null -ne $selector1
                     $hasSelector2 = $null -ne $selector2
@@ -192,7 +192,7 @@ function Get-M365DomainReadiness {
                 Write-Verbose "Checking email authentication status for $domain"
                 try {
                     # Check SPF
-                    $txtRecords = Resolve-DnsName -Name $domain -Type TXT -ErrorAction SilentlyContinue
+                    $txtRecords = Resolve-DnsOverHttps -Name $domain -Type TXT -ErrorAction SilentlyContinue
                     $spfRecord = $txtRecords | Where-Object { $_.Strings -like "v=spf1*" } | Select-Object -First 1
 
                     if ($spfRecord) {
@@ -209,7 +209,7 @@ function Get-M365DomainReadiness {
                     }
 
                     # Check DMARC
-                    $dmarcRecord = Resolve-DnsName -Name "_dmarc.$domain" -Type TXT -ErrorAction SilentlyContinue
+                    $dmarcRecord = Resolve-DnsOverHttps -Name "_dmarc.$domain" -Type TXT -ErrorAction SilentlyContinue
                     if ($dmarcRecord) {
                         $domainStatus.DMARCConfigured = $true
                         $dmarcText = $dmarcRecord.Strings -join ""
@@ -236,7 +236,7 @@ function Get-M365DomainReadiness {
                 Write-Verbose "Checking for deprecated records"
                 try {
                     # Check msoid (CRITICAL - blocks M365 Apps)
-                    $msoid = Resolve-DnsName -Name "msoid.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                    $msoid = Resolve-DnsOverHttps -Name "msoid.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($msoid) {
                         $domainStatus.DeprecatedRecords += "msoid.$domain"
                         $domainStatus.CriticalActions += "CRITICAL: Remove msoid.$domain CNAME - BLOCKS Microsoft 365 Apps activation"
@@ -249,19 +249,19 @@ function Get-M365DomainReadiness {
                 # 5. Check for Legacy Teams/Skype Records
                 Write-Verbose "Checking for legacy Teams/Skype for Business records"
                 try {
-                    $sip = Resolve-DnsName -Name "sip.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                    $sip = Resolve-DnsOverHttps -Name "sip.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($sip) {
                         $domainStatus.LegacyTeamsRecords += "sip.$domain CNAME"
                         $domainStatus.Recommendations += "sip.$domain CNAME is legacy (Skype for Business) - not required for Teams-only tenants"
                     }
 
-                    $lyncdiscover = Resolve-DnsName -Name "lyncdiscover.$domain" -Type CNAME -ErrorAction SilentlyContinue
+                    $lyncdiscover = Resolve-DnsOverHttps -Name "lyncdiscover.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($lyncdiscover) {
                         $domainStatus.LegacyTeamsRecords += "lyncdiscover.$domain CNAME"
                         $domainStatus.Recommendations += "lyncdiscover.$domain CNAME is legacy (Skype for Business) - not required for Teams-only tenants"
                     }
 
-                    $sipTLS = Resolve-DnsName -Name "_sip._tls.$domain" -Type SRV -ErrorAction SilentlyContinue
+                    $sipTLS = Resolve-DnsOverHttps -Name "_sip._tls.$domain" -Type SRV -ErrorAction SilentlyContinue
                     if ($sipTLS) {
                         $domainStatus.LegacyTeamsRecords += "_sip._tls.$domain SRV"
                         $domainStatus.Recommendations += "_sip._tls.$domain SRV is legacy - Teams-only needs _sipfederationtls._tcp only"
