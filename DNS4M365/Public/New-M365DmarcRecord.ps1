@@ -248,45 +248,45 @@ function New-M365DmarcRecord {
         # Output based on format
         switch ($OutputFormat) {
             'DNS' {
-                Write-Host "`nGenerated DMARC Record:" -ForegroundColor Cyan
-                Write-Host "======================" -ForegroundColor Cyan
-                Write-Host "`nDNS Record Name:" -ForegroundColor Yellow
-                Write-Host "  _dmarc.$Domain" -ForegroundColor White
-                Write-Host "`nRecord Type:" -ForegroundColor Yellow
-                Write-Host "  TXT" -ForegroundColor White
-                Write-Host "`nRecord Value:" -ForegroundColor Yellow
-                Write-Host "  $dmarcRecord" -ForegroundColor White
-                Write-Host "`nTTL:" -ForegroundColor Yellow
-                Write-Host "  3600 (1 hour)" -ForegroundColor White
-                Write-Host "`nConfiguration Summary:" -ForegroundColor Yellow
-                Write-Host "  Policy: $Policy" -ForegroundColor White
+                Write-Information "`nGenerated DMARC Record:" -InformationAction Continue
+                Write-Information "======================" -InformationAction Continue
+                Write-Information "`nDNS Record Name:" -InformationAction Continue
+                Write-Information "  _dmarc.$Domain" -InformationAction Continue
+                Write-Information "`nRecord Type:" -InformationAction Continue
+                Write-Information "  TXT" -InformationAction Continue
+                Write-Information "`nRecord Value:" -InformationAction Continue
+                Write-Information "  $dmarcRecord" -InformationAction Continue
+                Write-Information "`nTTL:" -InformationAction Continue
+                Write-Information "  3600 (1 hour)" -InformationAction Continue
+                Write-Information "`nConfiguration Summary:" -InformationAction Continue
+                Write-Information "  Policy: $Policy" -InformationAction Continue
                 if ($SubdomainPolicy) {
-                    Write-Host "  Subdomain Policy: $SubdomainPolicy" -ForegroundColor White
+                    Write-Information "  Subdomain Policy: $SubdomainPolicy" -InformationAction Continue
                 }
-                Write-Host "  Percentage: $Percentage%" -ForegroundColor White
-                Write-Host "  Alignment: $Alignment" -ForegroundColor White
+                Write-Information "  Percentage: $Percentage%" -InformationAction Continue
+                Write-Information "  Alignment: $Alignment" -InformationAction Continue
                 if ($AggregateReportEmail) {
-                    Write-Host "  Aggregate Reports: $($AggregateReportEmail -join ', ')" -ForegroundColor White
+                    Write-Information "  Aggregate Reports: $($AggregateReportEmail -join ', ')" -InformationAction Continue
                 }
                 if ($ForensicReportEmail) {
-                    Write-Host "  Forensic Reports: $($ForensicReportEmail -join ', ')" -ForegroundColor White
+                    Write-Information "  Forensic Reports: $($ForensicReportEmail -join ', ')" -InformationAction Continue
                 }
 
-                Write-Host "`nNext Steps:" -ForegroundColor Cyan
-                Write-Host "  1. Add the TXT record to your DNS zone at your domain registrar" -ForegroundColor White
-                Write-Host "  2. Wait for DNS propagation (up to 48 hours, typically 15-60 minutes)" -ForegroundColor White
-                Write-Host "  3. Verify with: Resolve-DnsName _dmarc.$Domain -Type TXT" -ForegroundColor White
-                Write-Host "  4. Monitor aggregate reports for 2-4 weeks" -ForegroundColor White
+                Write-Information "`nNext Steps:" -InformationAction Continue
+                Write-Information "  1. Add the TXT record to your DNS zone at your domain registrar" -InformationAction Continue
+                Write-Information "  2. Wait for DNS propagation (up to 48 hours, typically 15-60 minutes)" -InformationAction Continue
+                Write-Information "  3. Verify with: Resolve-DnsName _dmarc.$Domain -Type TXT" -InformationAction Continue
+                Write-Information "  4. Monitor aggregate reports for 2-4 weeks" -InformationAction Continue
 
                 if ($Policy -eq 'none') {
-                    Write-Host "`n  ⚠️  Monitoring Mode: After reviewing reports, consider p=quarantine" -ForegroundColor Yellow
+                    Write-Information "`n  [WARNING] Monitoring Mode: After reviewing reports, consider p=quarantine" -InformationAction Continue
                 }
 
-                Write-Host "`nValidation Tools:" -ForegroundColor Cyan
-                Write-Host "  - https://mxtoolbox.com/SuperTool.aspx?action=dmarc%3a$Domain" -ForegroundColor White
-                Write-Host "  - https://dmarcian.com/dmarc-inspector/" -ForegroundColor White
+                Write-Information "`nValidation Tools:" -InformationAction Continue
+                Write-Information "  - https://mxtoolbox.com/SuperTool.aspx?action=dmarc%3a$Domain" -InformationAction Continue
+                Write-Information "  - https://dmarcian.com/dmarc-inspector/" -InformationAction Continue
 
-                Write-Host ""
+                Write-Information "" -InformationAction Continue
 
                 return $dmarcRecord
             }

@@ -94,7 +94,7 @@ function Export-M365DomainReport {
 
     process {
         try {
-            Write-Host "Generating Microsoft 365 Domain DNS Report..." -ForegroundColor Cyan
+            Write-Information "Generating Microsoft 365 Domain DNS Report..." -InformationAction Continue
 
             # Collect domain data
             Write-Verbose "Retrieving domains..."
@@ -104,7 +104,7 @@ function Export-M365DomainReport {
                 $domains = $domains | Where-Object { $_.IsVerified -eq $true }
             }
 
-            Write-Host "  Processing $($domains.Count) domain(s)..." -ForegroundColor White
+            Write-Information "  Processing $($domains.Count) domain(s)..." -InformationAction Continue
 
             # Build comprehensive report data
             $reportData = @()
@@ -201,11 +201,11 @@ function Export-M365DomainReport {
                 switch ($fmt) {
                     'CSV' {
                         $reportData | Export-Csv -Path $fullPath -NoTypeInformation -Encoding UTF8
-                        Write-Host "  CSV report saved: $fullPath" -ForegroundColor Green
+                        Write-Information "  CSV report saved: $fullPath" -InformationAction Continue
                     }
                     'JSON' {
                         $reportData | ConvertTo-Json -Depth 10 | Out-File -FilePath $fullPath -Encoding UTF8
-                        Write-Host "  JSON report saved: $fullPath" -ForegroundColor Green
+                        Write-Information "  JSON report saved: $fullPath" -InformationAction Continue
                     }
                     'HTML' {
                         $htmlContent = @"
@@ -259,14 +259,14 @@ function Export-M365DomainReport {
 </html>
 "@
                         $htmlContent | Out-File -FilePath $fullPath -Encoding UTF8
-                        Write-Host "  HTML report saved: $fullPath" -ForegroundColor Green
+                        Write-Information "  HTML report saved: $fullPath" -InformationAction Continue
                     }
                 }
 
                 $outputFiles += $fullPath
             }
 
-            Write-Host "`nReport generation completed successfully!" -ForegroundColor Green
+            Write-Information "`nReport generation completed successfully!" -InformationAction Continue
             return $outputFiles
         }
         catch {
