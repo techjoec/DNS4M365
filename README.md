@@ -50,6 +50,44 @@ DNS4M365 simplifies the process of retrieving, validating, and managing DNS reco
 
 ## Quick Start
 
+### Installation
+
+**Step 1: Clone or Download**
+```powershell
+git clone https://github.com/yourusername/DNS4M365.git
+cd DNS4M365
+```
+
+**Step 2: Install Dependencies (Optional)**
+
+Choose based on your use case:
+
+- **For CSV/JSON offline validation**: No dependencies needed! Skip to Step 3.
+- **For Graph API features**: Install Microsoft Graph modules
+  ```powershell
+  Install-Module Microsoft.Graph.Authentication -Scope CurrentUser -Force
+  Install-Module Microsoft.Graph.Identity.DirectoryManagement -Scope CurrentUser -Force
+  ```
+- **For automatic DKIM validation**: Also install Exchange Online module
+  ```powershell
+  Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
+  ```
+
+**Step 3: Import Module**
+```powershell
+Import-Module .\DNS4M365\DNS4M365.psd1
+```
+
+**Step 4: Start Using**
+```powershell
+# Option A: CSV/JSON offline validation (no authentication)
+Test-M365DnsCompliance -CSVPath ".\Templates\expected-dns-records-template.csv"
+
+# Option B: Interactive with Graph API (authentication required)
+Connect-MgGraph -Scopes "Domain.Read.All"
+Test-M365DnsCompliance -Name "contoso.com"
+```
+
 ### Prerequisites
 
 #### Required
@@ -166,31 +204,7 @@ Get-ConnectionInformation
 Test-M365DnsCompliance -Name "contoso.com" -IncludeSPF -IncludeDMARC -CheckDKIM -UseExchangeOnline
 ```
 
-##### Method 2: Certificate-Based Authentication (Service Principals / CI/CD)
-
-**Microsoft Graph:**
-```powershell
-# Connect using certificate thumbprint
-Connect-MgGraph -ClientId "YOUR_APP_ID" `
-                -TenantId "YOUR_TENANT_ID" `
-                -CertificateThumbprint "YOUR_CERT_THUMBPRINT"
-
-# OR using certificate from file
-$cert = Get-PfxCertificate -FilePath "C:\Certs\app-cert.pfx"
-Connect-MgGraph -ClientId "YOUR_APP_ID" `
-                -TenantId "YOUR_TENANT_ID" `
-                -Certificate $cert
-```
-
-**Exchange Online:**
-```powershell
-# Connect using certificate
-Connect-ExchangeOnline -CertificateThumbprint "YOUR_CERT_THUMBPRINT" `
-                        -AppId "YOUR_APP_ID" `
-                        -Organization "contoso.onmicrosoft.com"
-```
-
-##### Method 3: CSV/JSON-Based Offline Validation (No Authentication Required)
+##### Method 2: CSV/JSON-Based Offline Validation (No Authentication Required)
 
 For scenarios where you don't have or don't want to use live API access:
 
@@ -213,51 +227,6 @@ Compare-M365DnsRecord -JSONPath ".\expected-dns-records.json"
 - Ideal for testing and validation scripts
 - Works in restricted environments
 - Reproducible validation (version-controlled expected values)
-
-#### Setting Up Service Principal Authentication
-
-For automated/CI-CD scenarios, create a service principal with certificate authentication:
-
-**Step 1: Register Azure AD Application**
-```powershell
-# In Azure Portal or Azure CLI
-az ad app create --display-name "DNS4M365-Automation"
-
-# Note the Application (client) ID and Tenant ID
-```
-
-**Step 2: Create and Upload Certificate**
-```powershell
-# Create self-signed certificate
-$cert = New-SelfSignedCertificate -Subject "CN=DNS4M365-Automation" `
-                                   -CertStoreLocation "Cert:\CurrentUser\My" `
-                                   -KeyExportPolicy Exportable `
-                                   -KeySpec Signature `
-                                   -NotAfter (Get-Date).AddYears(2)
-
-# Export certificate
-Export-Certificate -Cert $cert -FilePath ".\DNS4M365-Automation.cer"
-
-# Upload to Azure AD app registration (Certificates & secrets)
-```
-
-**Step 3: Assign API Permissions**
-```
-1. Go to Azure Portal > App registrations > Your App
-2. API permissions > Add a permission
-3. Microsoft Graph > Application permissions > Domain.Read.All
-4. Grant admin consent
-```
-
-**Step 4: Assign Exchange Online Permissions**
-```powershell
-# Connect to Exchange Online as admin
-Connect-ExchangeOnline
-
-# Add service principal to role group
-New-ManagementRoleAssignment -Role "View-Only Configuration" `
-                              -App "YOUR_APP_ID"
-```
 
 ### Basic Usage
 
@@ -299,7 +268,7 @@ This guide covers:
 - **Enhanced Test-M365DnsCompliance:** Added `-UseExchangeOnline`, `-CSVPath`, `-CheckMTASTS` parameters
 - **Enhanced Compare-M365DnsRecord:** Added `-CSVPath` parameter for offline comparison
 - **CSV Template:** Pre-built template (Templates/expected-dns-records-template.csv) for offline validation
-- **Comprehensive Permissions Documentation:** Detailed guide for Graph API, Exchange Online, and service principal authentication
+- **Comprehensive Permissions Documentation:** Detailed guide for Graph API and Exchange Online
 
 **Dependencies:**
 - Added ExchangeOnlineManagement module (v3.0.0+) for DKIM validation
@@ -716,8 +685,8 @@ Get-M365DomainDNSRecord -DomainName "contoso.com" -Verbose
 - [ ] Create interactive dashboard/UI
 - [ ] Implement email notification capabilities
 - [ ] Add scheduled task templates
-- [ ] Create Pester tests
-- [ ] Add CI/CD pipeline
+- [x] Create Pester tests
+- [x] Add CI/CD pipeline
 
 ## Contributing
 
