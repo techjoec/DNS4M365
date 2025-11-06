@@ -127,6 +127,11 @@ function Compare-M365DomainDNS {
                                         $comparison.Status = "Mismatch"
                                         $comparison.Details = "Expected: $($record.AdditionalProperties['mailExchange']), Got: $($primaryMX.NameExchange)"
                                     }
+
+                                    # Check for legacy MX format (July-August 2025 migration)
+                                    if ($primaryMX.NameExchange -like "*.mail.protection.outlook.com") {
+                                        $comparison.Details += " | NOTE: Legacy MX format detected (consider migrating to mx.microsoft)"
+                                    }
                                 }
                                 else {
                                     $comparison.Status = "Missing"
@@ -153,6 +158,16 @@ function Compare-M365DomainDNS {
                                     else {
                                         $comparison.Status = "Mismatch"
                                         $comparison.Details = "Expected: $($record.AdditionalProperties['canonicalName']), Got: $($actual.NameHost)"
+                                    }
+
+                                    # Check for legacy DKIM format (May 2025 new format)
+                                    if ($label -like "selector*._domainkey" -and $actual.NameHost -like "*._domainkey.*.onmicrosoft.com") {
+                                        $comparison.Details += " | NOTE: Legacy DKIM format (new deployments use dkim.mail.microsoft)"
+                                    }
+
+                                    # Check for legacy Skype for Business records
+                                    if ($label -eq "sip" -or $label -eq "lyncdiscover") {
+                                        $comparison.Details += " | NOTE: Legacy Skype for Business record (not required for Teams-only tenants)"
                                     }
                                 }
                                 else {
@@ -240,7 +255,7 @@ function Compare-M365DomainDNS {
                 # Check for optional records if requested
                 if ($IncludeOptional) {
                     # Check DMARC
-                    Write-Verbose "Checking optional DMARC record"
+                    Write-Verbose "Checking DMARC record (MANDATORY starting April 2025)"
                     try {
                         $dmarc = Resolve-DnsName -Name "_dmarc.$domain" -Type TXT -ErrorAction SilentlyContinue
                         $dmarcComparison = [PSCustomObject]@{
@@ -248,13 +263,13 @@ function Compare-M365DomainDNS {
                             RecordType = "TXT"
                             Label = "_dmarc"
                             FQDN = "_dmarc.$domain"
-                            ExpectedValue = "v=DMARC1; p=quarantine or p=reject (recommended)"
+                            ExpectedValue = "v=DMARC1; p=quarantine or p=reject (MANDATORY April 2025)"
                             ActualValue = if ($dmarc) { ($dmarc.Strings -join "") } else { "(not found)" }
-                            Status = if ($dmarc) { "Present" } else { "Missing" }
+                            Status = if ($dmarc) { "Present" } else { "CRITICAL - Missing" }
                             SupportedService = "Email Security"
-                            IsOptional = $true
+                            IsOptional = $false  # Changed: MANDATORY as of April 2025
                             TTL = if ($dmarc) { $dmarc.TTL } else { $null }
-                            Details = if (-not $dmarc) { "DMARC highly recommended for email security" } else { $null }
+                            Details = if (-not $dmarc) { "CRITICAL: Email authentication MANDATORY starting April 2025 - DMARC record MUST exist with policy p=quarantine or p=reject" } else { $null }
                         }
                         $comparisonResults += $dmarcComparison
                     }

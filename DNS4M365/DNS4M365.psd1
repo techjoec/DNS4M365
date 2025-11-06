@@ -3,7 +3,7 @@
     RootModule = 'DNS4M365.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.0'
+    ModuleVersion = '1.1.0'
 
     # ID used to uniquely identify this module
     GUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
@@ -38,7 +38,8 @@
         'Export-M365DomainReport',
         'Test-M365DomainVerification',
         'Get-M365DomainDNSHealth',
-        'Compare-M365DomainDNS'
+        'Compare-M365DomainDNS',
+        'Get-M365DomainMigrationStatus'
     )
 
     # Cmdlets to export from this module
@@ -56,7 +57,21 @@
             Tags = @('Microsoft365', 'M365', 'DNS', 'Domains', 'Graph', 'Azure', 'EntraID')
             LicenseUri = 'https://github.com/yourusername/DNS4M365/blob/main/LICENSE'
             ProjectUri = 'https://github.com/yourusername/DNS4M365'
-            ReleaseNotes = 'Initial release - Domain enumeration and DNS record retrieval functionality'
+            ReleaseNotes = @'
+Version 1.1.0 (2025-01-06):
+- Enhanced DNS health checks with 2024-2025 Microsoft 365 updates
+- Added detection for new mx.microsoft MX record format (July-August 2025 migration)
+- Added detection for new dkim.mail.microsoft DKIM format (May 2025+)
+- Added critical warnings for mandatory email authentication (SPF/DMARC - April 2025)
+- Enhanced deprecated record detection (msoid, legacy Skype for Business)
+- Added Get-M365DomainMigrationStatus function for migration readiness assessment
+- Updated regional endpoint detection (GCC High, DoD, 21Vianet)
+- Added Teams-only vs hybrid Skype for Business detection
+- Enhanced comparison function with legacy format warnings
+
+Version 1.0.0 (2025-01-05):
+- Initial release - Domain enumeration and DNS record retrieval functionality
+'@
         }
     }
 }

@@ -121,16 +121,34 @@ function Get-M365DomainDNSHealth {
                     $mxRecords = Resolve-DnsName -Name $domain -Type MX -ErrorAction SilentlyContinue
                     if ($mxRecords) {
                         $primaryMX = $mxRecords | Sort-Object Preference | Select-Object -First 1
+
+                        # Detect MX format (2024-2025 updates)
+                        $isNewFormat = $primaryMX.NameExchange -like "*.mx.microsoft"
+                        $isLegacyFormat = $primaryMX.NameExchange -like "*.mail.protection.outlook.com" -or
+                                         $primaryMX.NameExchange -like "*.mail.protection.office365.us"
+                        $isGCCHigh = $primaryMX.NameExchange -like "*.mail.protection.office365.us"
+                        $isDoD = $primaryMX.NameExchange -like "*.protection.office365.us"
+                        $is21Vianet = $primaryMX.NameExchange -like "*.mail.protection.partner.outlook.cn"
+
                         $domainHealth.MXRecord = [PSCustomObject]@{
                             Exists = $true
                             Target = $primaryMX.NameExchange
                             Priority = $primaryMX.Preference
-                            IsMicrosoft365 = $primaryMX.NameExchange -like "*.mail.protection.outlook.com" -or
-                                             $primaryMX.NameExchange -like "*.mail.protection.office365.us"
+                            IsMicrosoft365 = $isNewFormat -or $isLegacyFormat -or $isGCCHigh -or $isDoD -or $is21Vianet
+                            Format = if ($isNewFormat) { "Modern (mx.microsoft)" }
+                                    elseif ($isLegacyFormat) { "Legacy (mail.protection.outlook.com)" }
+                                    elseif ($isGCCHigh -or $isDoD) { "Government Cloud" }
+                                    elseif ($is21Vianet) { "21Vianet China" }
+                                    else { "Non-Microsoft" }
                         }
 
                         if (-not $domainHealth.MXRecord.IsMicrosoft365) {
                             $domainHealth.Warnings += "MX record does not point to Microsoft 365"
+                        }
+
+                        # Migration notice for legacy format (July-August 2025 migration)
+                        if ($isLegacyFormat) {
+                            $domainHealth.Recommendations += "Consider migrating to new mx.microsoft format (Microsoft Message Center MC1048624, July-August 2025 timeline)"
                         }
                     }
                     else {
@@ -179,27 +197,29 @@ function Get-M365DomainDNSHealth {
                             $domainHealth.SPFRecord = [PSCustomObject]@{
                                 Exists = $true
                                 Value = $spfText
-                                IncludesMicrosoft365 = $spfText -like "*spf.protection.outlook.com*"
+                                IncludesMicrosoft365 = $spfText -like "*spf.protection.outlook.com*" -or $spfText -like "*spf.protection.office365.us*"
                                 HasHardFail = $spfText -like "*-all"
                                 HasSoftFail = $spfText -like "*~all"
                                 LookupCount = ($spfText | Select-String -Pattern "include:" -AllMatches).Matches.Count
                             }
 
                             if (-not $domainHealth.SPFRecord.IncludesMicrosoft365) {
-                                $domainHealth.Issues += "SPF record does not include Microsoft 365"
+                                $domainHealth.Issues += "SPF record does not include Microsoft 365 (spf.protection.outlook.com)"
+                                $domainHealth.Issues += "CRITICAL: Email authentication mandatory starting April 2025 - SPF must include Microsoft 365"
                             }
 
                             if ($domainHealth.SPFRecord.LookupCount -gt 10) {
-                                $domainHealth.Issues += "SPF record exceeds 10 DNS lookup limit"
+                                $domainHealth.Issues += "SPF record exceeds 10 DNS lookup limit (RFC 7208)"
                             }
 
                             if (-not $domainHealth.SPFRecord.HasHardFail) {
-                                $domainHealth.Recommendations += "Consider using -all (hard fail) instead of ~all (soft fail) for SPF"
+                                $domainHealth.Recommendations += "Consider using -all (hard fail) instead of ~all (soft fail) for SPF to improve email security"
                             }
                         }
                         else {
                             $domainHealth.SPFRecord = [PSCustomObject]@{ Exists = $false }
-                            $domainHealth.Issues += "No SPF record found"
+                            $domainHealth.Issues += "No SPF record found - REQUIRED for email delivery"
+                            $domainHealth.Issues += "CRITICAL: Email authentication mandatory starting April 2025 - SPF record MUST exist"
                         }
                     }
                     catch {
@@ -219,16 +239,23 @@ function Get-M365DomainDNSHealth {
                                 Exists = $true
                                 Value = $dmarcText
                                 Policy = if ($dmarcText -match "p=([^;]+)") { $Matches[1] } else { "unknown" }
+                                SubdomainPolicy = if ($dmarcText -match "sp=([^;]+)") { $Matches[1] } else { "inherited" }
                                 HasReporting = $dmarcText -like "*rua=*"
+                                HasForensics = $dmarcText -like "*ruf=*"
                             }
 
                             if ($domainHealth.DMARCRecord.Policy -eq "none") {
-                                $domainHealth.Recommendations += "DMARC policy is 'none' - consider upgrading to 'quarantine' or 'reject'"
+                                $domainHealth.Recommendations += "DMARC policy is 'none' - consider upgrading to 'quarantine' or 'reject' for better protection"
+                            }
+
+                            if (-not $domainHealth.DMARCRecord.HasReporting) {
+                                $domainHealth.Recommendations += "Add DMARC reporting (rua=) to receive email authentication reports"
                             }
                         }
                         else {
                             $domainHealth.DMARCRecord = [PSCustomObject]@{ Exists = $false }
-                            $domainHealth.Warnings += "No DMARC record found - strongly recommended for email security"
+                            $domainHealth.Issues += "No DMARC record found - REQUIRED for email security"
+                            $domainHealth.Issues += "CRITICAL: Email authentication mandatory starting April 2025 - DMARC record MUST exist with policy p=quarantine or p=reject"
                         }
                     }
                     catch {
@@ -240,30 +267,44 @@ function Get-M365DomainDNSHealth {
                 if ($CheckDKIMResolution) {
                     Write-Verbose "Checking DKIM records for $domain"
                     try {
-                        # Try to get DKIM configuration from Graph API first
-                        $domainFormatted = $domain -replace '\.', '-'
-                        $tenantDomain = $context.TenantId
-
                         $selector1Host = "selector1._domainkey.$domain"
                         $selector2Host = "selector2._domainkey.$domain"
 
                         $selector1 = Resolve-DnsName -Name $selector1Host -Type CNAME -ErrorAction SilentlyContinue
                         $selector2 = Resolve-DnsName -Name $selector2Host -Type CNAME -ErrorAction SilentlyContinue
 
+                        # Detect DKIM format (legacy vs new May 2025 format)
+                        $isLegacyFormat1 = if ($selector1) { $selector1.NameHost -like "*._domainkey.*.onmicrosoft.com" } else { $false }
+                        $isNewFormat1 = if ($selector1) { $selector1.NameHost -like "*._domainkey.*.dkim.mail.microsoft" } else { $false }
+                        $isLegacyFormat2 = if ($selector2) { $selector2.NameHost -like "*._domainkey.*.onmicrosoft.com" } else { $false }
+                        $isNewFormat2 = if ($selector2) { $selector2.NameHost -like "*._domainkey.*.dkim.mail.microsoft" } else { $false }
+
                         $domainHealth.DKIMSelector1 = [PSCustomObject]@{
                             Exists = $null -ne $selector1
                             Target = if ($selector1) { $selector1.NameHost } else { $null }
-                            PointsToMicrosoft = if ($selector1) { $selector1.NameHost -like "*._domainkey.*.onmicrosoft.com" } else { $false }
+                            PointsToMicrosoft = $isLegacyFormat1 -or $isNewFormat1
+                            Format = if ($isNewFormat1) { "Modern (dkim.mail.microsoft)" }
+                                    elseif ($isLegacyFormat1) { "Legacy (onmicrosoft.com)" }
+                                    else { "Unknown" }
                         }
 
                         $domainHealth.DKIMSelector2 = [PSCustomObject]@{
                             Exists = $null -ne $selector2
                             Target = if ($selector2) { $selector2.NameHost } else { $null }
-                            PointsToMicrosoft = if ($selector2) { $selector2.NameHost -like "*._domainkey.*.onmicrosoft.com" } else { $false }
+                            PointsToMicrosoft = $isLegacyFormat2 -or $isNewFormat2
+                            Format = if ($isNewFormat2) { "Modern (dkim.mail.microsoft)" }
+                                    elseif ($isLegacyFormat2) { "Legacy (onmicrosoft.com)" }
+                                    else { "Unknown" }
                         }
 
                         if (-not $domainHealth.DKIMSelector1.Exists -or -not $domainHealth.DKIMSelector2.Exists) {
                             $domainHealth.Warnings += "DKIM selectors not configured - email authentication will be limited"
+                            $domainHealth.Recommendations += "Configure DKIM signing in Exchange Online admin center for this domain"
+                        }
+
+                        # Migration notice for legacy DKIM format
+                        if ($isLegacyFormat1 -or $isLegacyFormat2) {
+                            $domainHealth.Recommendations += "DKIM using legacy format - new deployments use dkim.mail.microsoft format (May 2025+)"
                         }
                     }
                     catch {
@@ -289,10 +330,13 @@ function Get-M365DomainDNSHealth {
                             if (-not $domainHealth.SIPTLSSRVRecord.IsCorrect) {
                                 $domainHealth.Warnings += "SIP TLS SRV record does not point to Microsoft"
                             }
+
+                            # Note: _sip._tls may be legacy for Teams-only tenants
+                            $domainHealth.Recommendations += "NOTE: _sip._tls SRV record is legacy - Teams-only tenants only need _sipfederationtls._tcp (2024 update)"
                         }
                         else {
                             $domainHealth.SIPTLSSRVRecord = [PSCustomObject]@{ Exists = $false }
-                            $domainHealth.Warnings += "No SIP TLS SRV record found - Teams federation may not work"
+                            # Not a warning anymore - this is expected for Teams-only
                         }
                     }
                     catch {
@@ -316,7 +360,7 @@ function Get-M365DomainDNSHealth {
                         }
                         else {
                             $domainHealth.SIPFederationSRVRecord = [PSCustomObject]@{ Exists = $false }
-                            $domainHealth.Warnings += "No SIP Federation SRV record found - Teams federation may not work"
+                            $domainHealth.Warnings += "No SIP Federation SRV record found - Teams external access/federation requires this record"
                         }
                     }
                     catch {
@@ -332,6 +376,9 @@ function Get-M365DomainDNSHealth {
                                 Target = $sip.NameHost
                                 IsCorrect = $sip.NameHost -like "*online.lync.com"
                             }
+
+                            # Note: sip CNAME is legacy for Teams-only tenants
+                            $domainHealth.Recommendations += "NOTE: sip.$domain CNAME is legacy (Skype for Business) - not required for Teams-only tenants"
                         }
                         else {
                             $domainHealth.SIPRecord = [PSCustomObject]@{ Exists = $false }
@@ -350,6 +397,9 @@ function Get-M365DomainDNSHealth {
                                 Target = $lyncdiscover.NameHost
                                 IsCorrect = $lyncdiscover.NameHost -like "*online.lync.com"
                             }
+
+                            # Note: lyncdiscover CNAME is legacy for Teams-only tenants
+                            $domainHealth.Recommendations += "NOTE: lyncdiscover.$domain CNAME is legacy (Skype for Business mobile) - not required for Teams-only tenants"
                         }
                         else {
                             $domainHealth.LyncdiscoverRecord = [PSCustomObject]@{ Exists = $false }

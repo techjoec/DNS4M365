@@ -113,6 +113,18 @@ This guide covers:
 - Using the Microsoft 365 Admin Center (GUI)
 - Using PowerShell (both native cmdlets and this module)
 
+### What's New in v1.1.0 (2025-01-06)
+
+**Enhanced for 2024-2025 Microsoft 365 DNS Changes:**
+
+- **NEW:** `Get-M365DomainMigrationStatus` - Assess migration readiness for 2025 DNS updates
+- **Enhanced MX Detection:** Identifies new `mx.microsoft` format (July-August 2025 migration)
+- **Enhanced DKIM Detection:** Identifies new `dkim.mail.microsoft` format (May 2025+)
+- **Mandatory Email Auth Warnings:** Critical alerts for SPF/DMARC requirements (April 2025)
+- **Deprecated Records:** Enhanced detection for msoid and legacy Skype for Business CNAMEs
+- **Regional Cloud Support:** Improved detection for GCC High, DoD, and 21Vianet
+- **Teams-Only Detection:** Identifies legacy Skype for Business records not needed for Teams
+
 ### Available Commands
 
 #### Connection Management
@@ -235,6 +247,34 @@ Export-M365DomainReport -IncludeUnverified
 Export-M365DomainReport -OutputPath "C:\Reports" -ReportName "M365-Domains-Monthly" -Format All
 ```
 
+#### Migration Assessment (NEW in v1.1.0)
+
+##### `Get-M365DomainMigrationStatus`
+Assesses domain readiness for 2024-2025 Microsoft 365 DNS migrations.
+
+```powershell
+# Assess all domains
+Get-M365DomainMigrationStatus
+
+# Assess specific domain with recommendations
+Get-M365DomainMigrationStatus -DomainName "contoso.com" -ShowRecommendations
+
+# Assess all domains and export report
+Get-M365DomainMigrationStatus -ExportReport -OutputPath "C:\Reports"
+
+# Get detailed migration recommendations
+Get-M365DomainMigrationStatus -ShowRecommendations
+```
+
+**What it checks:**
+- MX record format (legacy mail.protection.outlook.com vs new mx.microsoft)
+- DKIM format (legacy onmicrosoft.com vs new dkim.mail.microsoft)
+- Email authentication readiness (SPF/DMARC mandatory April 2025)
+- Deprecated records (msoid CNAME - blocks M365 Apps)
+- Legacy Teams/Skype for Business records
+- Overall migration readiness percentage
+- Migration priority (CRITICAL/High/Medium/Low)
+
 ## Examples
 
 ### Example 1: Basic Domain Audit
@@ -314,6 +354,27 @@ $records | Select-Object RecordType, Label,
         }
     }},
     TTL | Export-Csv -Path "$domainName-dns-records.csv" -NoTypeInformation
+```
+
+### Example 5: Migration Readiness Assessment (NEW in v1.1.0)
+
+```powershell
+# Assess all domains for 2025 DNS migrations
+$migrationStatus = Get-M365DomainMigrationStatus -ShowRecommendations
+
+# Filter domains that need critical attention
+$criticalDomains = $migrationStatus | Where-Object { $_.MigrationPriority -eq "CRITICAL" }
+
+# Display domains with legacy MX format
+$legacyMX = $migrationStatus | Where-Object { $_.MXNeedsMigration -eq $true }
+$legacyMX | Select-Object Domain, MXFormat, OverallReadiness | Format-Table
+
+# Display domains missing mandatory email authentication
+$noEmailAuth = $migrationStatus | Where-Object { $_.EmailAuthReady -eq $false }
+$noEmailAuth | Select-Object Domain, SPFConfigured, DMARCConfigured, EmailAuthStatus | Format-Table
+
+# Export comprehensive migration report
+Get-M365DomainMigrationStatus -ExportReport -OutputPath "C:\Reports"
 ```
 
 ### More Examples
@@ -437,13 +498,22 @@ Get-M365DomainDNSRecord -DomainName "contoso.com" -Verbose
 
 ## Roadmap
 
+### Completed in v1.1.0 (2025-01-06)
+
+- [x] Add DNS record comparison against actual DNS (`Compare-M365DomainDNS`)
+- [x] Add support for DMARC policy retrieval and validation
+- [x] Enhanced health checks with 2024-2025 Microsoft 365 updates
+- [x] Migration readiness assessment function (`Get-M365DomainMigrationStatus`)
+- [x] Detection for new mx.microsoft and dkim.mail.microsoft formats
+- [x] Mandatory email authentication warnings (April 2025)
+- [x] Deprecated record detection (msoid, legacy Skype for Business)
+
 ### Future Enhancements
 
+- [ ] Add DNSSEC/DANE availability checking
 - [ ] Add support for custom domain DNS record creation
 - [ ] Implement domain verification automation
-- [ ] Add DNS record comparison against actual DNS
 - [ ] Create interactive dashboard/UI
-- [ ] Add support for DMARC policy retrieval
 - [ ] Implement email notification capabilities
 - [ ] Add scheduled task templates
 - [ ] Create Pester tests
