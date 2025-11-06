@@ -315,7 +315,7 @@ To enable automatic DKIM validation via Exchange Online PowerShell:
             }
 
             foreach ($domain in $Name) {
-                Write-Host "`nValidating DNS compliance for: $domain" -ForegroundColor Cyan
+                Write-Information "`nValidating DNS compliance for: $domain" -InformationAction Continue
 
                 # Get domain information
                 $domainInfo = $null
@@ -720,42 +720,35 @@ To enable automatic DKIM validation via Exchange Online PowerShell:
                 }
 
                 # Display summary
-                $healthColor = switch ($compliance.OverallHealth) {
-                    "Healthy" { "Green" }
-                    "Warning" { "Yellow" }
-                    "Critical" { "Red" }
-                    default { "White" }
-                }
-
-                Write-Host "  Overall Health: $($compliance.OverallHealth) ($($compliance.ComplianceScore)%)" -ForegroundColor $healthColor
-                Write-Host "  MX Status: $($compliance.MXStatus) ($($compliance.MXFormat))" -ForegroundColor White
+                Write-Information "  Overall Health: $($compliance.OverallHealth) ($($compliance.ComplianceScore)%)" -InformationAction Continue
+                Write-Information "  MX Status: $($compliance.MXStatus) ($($compliance.MXFormat))" -InformationAction Continue
 
                 if ($compliance.DKIMStatus -ne "Unknown") {
-                    Write-Host "  DKIM Status: $($compliance.DKIMStatus) ($($compliance.DKIMFormat))" -ForegroundColor White
+                    Write-Information "  DKIM Status: $($compliance.DKIMStatus) ($($compliance.DKIMFormat))" -InformationAction Continue
                 }
 
                 if ($IncludeSPF) {
-                    Write-Host "  SPF Status: $($compliance.SPFStatus)" -ForegroundColor White
+                    Write-Information "  SPF Status: $($compliance.SPFStatus)" -InformationAction Continue
                 }
 
                 if ($IncludeDMARC) {
-                    Write-Host "  DMARC Status: $($compliance.DMARCStatus)" -ForegroundColor White
+                    Write-Information "  DMARC Status: $($compliance.DMARCStatus)" -InformationAction Continue
                 }
 
                 if ($CheckMTASTS) {
-                    Write-Host "  MTA-STS Status: $($compliance.MTASTSStatus)" -ForegroundColor White
+                    Write-Information "  MTA-STS Status: $($compliance.MTASTSStatus)" -InformationAction Continue
                 }
 
                 # Show issues
                 if ($compliance.Issues.Count -gt 0) {
-                    Write-Host "`n  Issues Found:" -ForegroundColor Yellow
-                    $compliance.Issues | ForEach-Object { Write-Host "    - $_" -ForegroundColor White }
+                    Write-Information "`n  Issues Found:" -InformationAction Continue
+                    $compliance.Issues | ForEach-Object { Write-Information "    - $_" -InformationAction Continue }
                 }
 
                 # Show recommendations if requested
                 if ($ShowRecommendations -and $compliance.Recommendations.Count -gt 0) {
-                    Write-Host "`n  Recommendations:" -ForegroundColor Cyan
-                    $compliance.Recommendations | ForEach-Object { Write-Host "    - $_" -ForegroundColor White }
+                    Write-Information "`n  Recommendations:" -InformationAction Continue
+                    $compliance.Recommendations | ForEach-Object { Write-Information "    - $_" -InformationAction Continue }
                 }
 
                 $complianceResults += $compliance

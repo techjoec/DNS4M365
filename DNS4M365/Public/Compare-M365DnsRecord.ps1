@@ -245,7 +245,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
                     throw "Baseline file not found: $BaselinePath"
                 }
 
-                Write-Host "Loading baseline from: $BaselinePath" -ForegroundColor Cyan
+                Write-Information "Loading baseline from: $BaselinePath" -InformationAction Continue
                 $baseline = Get-Content -Path $BaselinePath -Raw | ConvertFrom-Json
             }
 
@@ -269,7 +269,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
             }
 
             foreach ($domain in $Name) {
-                Write-Host "`nComparing DNS records for: $domain" -ForegroundColor Cyan
+                Write-Information "`nComparing DNS records for: $domain" -InformationAction Continue
 
                 # Get expected records from CSV, baseline, or Graph API
                 if ($CompareToBaseline -and $baseline) {
@@ -571,44 +571,45 @@ OPTION 3: Use baseline comparison (no dependencies required):
                         }
                     }
                     catch {
-                        # Good - record doesn't exist
+                        # Intentionally empty - msoid record should not exist for non-federated domains
+                        Write-Verbose "No msoid record found (expected for non-federated domains)"
                     }
                 }
             }
 
             # Save baseline if requested
             if ($SaveBaseline) {
-                Write-Host "`nSaving baseline to: $BaselinePath" -ForegroundColor Cyan
+                Write-Information "`nSaving baseline to: $BaselinePath" -InformationAction Continue
                 $comparisonResults | ConvertTo-Json -Depth 10 | Set-Content -Path $BaselinePath
-                Write-Host "Baseline saved successfully" -ForegroundColor Green
+                Write-Information "Baseline saved successfully" -InformationAction Continue
             }
 
             # Display summary
-            Write-Host "`n=== DNS Comparison Summary ===" -ForegroundColor Cyan
+            Write-Information "`n=== DNS Comparison Summary ===" -InformationAction Continue
 
             $totalRecords = $comparisonResults.Count
-            $matches = ($comparisonResults | Where-Object { $_.Status -eq "Match" }).Count
+            $matchCount = ($comparisonResults | Where-Object { $_.Status -eq "Match" }).Count
             $mismatches = ($comparisonResults | Where-Object { $_.Status -eq "Mismatch" }).Count
             $missing = ($comparisonResults | Where-Object { $_.Status -eq "Missing" }).Count
             $deprecated = ($comparisonResults | Where-Object { $_.Status -like "*DEPRECATED*" }).Count
 
-            Write-Host "Total Records Checked: $totalRecords" -ForegroundColor White
-            Write-Host "Matches: $matches" -ForegroundColor Green
-            Write-Host "Mismatches: $mismatches" -ForegroundColor Yellow
-            Write-Host "Missing: $missing" -ForegroundColor Red
+            Write-Information "Total Records Checked: $totalRecords" -InformationAction Continue
+            Write-Information "Matches: $matchCount" -InformationAction Continue
+            Write-Information "Mismatches: $mismatches" -InformationAction Continue
+            Write-Information "Missing: $missing" -InformationAction Continue
             if ($deprecated -gt 0) {
-                Write-Host "Deprecated (REMOVE): $deprecated" -ForegroundColor Magenta
+                Write-Information "Deprecated (REMOVE): $deprecated" -InformationAction Continue
             }
 
             # Show details if requested
             if ($ShowOnlyDifference) {
                 $differences = $comparisonResults | Where-Object { $_.Status -ne "Match" }
                 if ($differences) {
-                    Write-Host "`nDifferences Found:" -ForegroundColor Yellow
+                    Write-Information "`nDifferences Found:" -InformationAction Continue
                     $differences | Format-Table Domain, RecordType, Label, Status, ExpectedValue, ActualValue -AutoSize
                 }
                 else {
-                    Write-Host "`nNo differences found - all DNS records match!" -ForegroundColor Green
+                    Write-Information "`nNo differences found - all DNS records match!" -InformationAction Continue
                 }
             }
             else {
@@ -620,7 +621,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
                 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
                 $reportFile = Join-Path -Path $OutputPath -ChildPath "DNS-Comparison-$timestamp.csv"
                 $comparisonResults | Export-Csv -Path $reportFile -NoTypeInformation
-                Write-Host "`nReport exported to: $reportFile" -ForegroundColor Green
+                Write-Information "`nReport exported to: $reportFile" -InformationAction Continue
             }
 
             return $comparisonResults

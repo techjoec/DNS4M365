@@ -98,26 +98,26 @@ function Watch-M365DnsPropagation {
     )
 
     begin {
-        Write-Host "`n=== DNS Propagation Monitor ===" -ForegroundColor Cyan
-        Write-Host "Domain: $Name" -ForegroundColor White
-        Write-Host "Record Type: $RecordType" -ForegroundColor White
-        Write-Host "Resolvers: $($Resolver -join ', ')" -ForegroundColor White
-        Write-Host "Check Interval: $Interval seconds" -ForegroundColor White
+        Write-Information "`n=== DNS Propagation Monitor ===" -InformationAction Continue
+        Write-Information "Domain: $Name" -InformationAction Continue
+        Write-Information "Record Type: $RecordType" -InformationAction Continue
+        Write-Information "Resolvers: $($Resolver -join ', ')" -InformationAction Continue
+        Write-Information "Check Interval: $Interval seconds" -InformationAction Continue
 
         if ($ExpectedValue) {
-            Write-Host "Expected Value: $ExpectedValue" -ForegroundColor Yellow
-            Write-Host "Monitoring until value propagates..." -ForegroundColor Yellow
+            Write-Information "Expected Value: $ExpectedValue" -InformationAction Continue
+            Write-Information "Monitoring until value propagates..." -InformationAction Continue
         }
 
         if ($Duration) {
-            Write-Host "Duration: $Duration minutes" -ForegroundColor White
+            Write-Information "Duration: $Duration minutes" -InformationAction Continue
         }
         else {
-            Write-Host "Duration: Continuous (press Ctrl+C to stop)" -ForegroundColor White
+            Write-Information "Duration: Continuous (press Ctrl+C to stop)" -InformationAction Continue
         }
 
-        Write-Host "`nStarting monitoring at $(Get-Date -Format 'HH:mm:ss')..." -ForegroundColor Green
-        Write-Host ("=" * 80) -ForegroundColor Cyan
+        Write-Information "`nStarting monitoring at $(Get-Date -Format 'HH:mm:ss')..." -InformationAction Continue
+        Write-Information ("=" * 80) -InformationAction Continue
 
         # Initialize tracking
         $startTime = Get-Date
@@ -139,7 +139,7 @@ function Watch-M365DnsPropagation {
                 if ($Duration) {
                     $elapsed = ((Get-Date) - $startTime).TotalMinutes
                     if ($elapsed -ge $Duration) {
-                        Write-Host "`nMonitoring duration ($Duration minutes) reached." -ForegroundColor Yellow
+                        Write-Information "`nMonitoring duration ($Duration minutes) reached." -InformationAction Continue
                         break
                     }
                 }
@@ -148,11 +148,10 @@ function Watch-M365DnsPropagation {
                 $timestamp = Get-Date -Format 'HH:mm:ss'
 
                 if (-not $Quiet) {
-                    Write-Host "`n[$timestamp] Check #$checkCount" -ForegroundColor Cyan
+                    Write-Information "`n[$timestamp] Check #$checkCount" -InformationAction Continue
                 }
 
                 $currentResults = @{}
-                $valuesMatch = $true
                 $matchExpected = 0
 
                 # Query each resolver
@@ -181,22 +180,19 @@ function Watch-M365DnsPropagation {
                         # Check for changes
                         if ($previousValues[$server] -and $previousValues[$server] -ne $value) {
                             $changeCount++
-                            Write-Host "  ⚠️  CHANGE DETECTED on $server" -ForegroundColor Yellow
-                            Write-Host "      Old: $($previousValues[$server])" -ForegroundColor DarkGray
-                            Write-Host "      New: $value" -ForegroundColor Green
+                            Write-Information "  ⚠️  CHANGE DETECTED on $server" -InformationAction Continue
+                            Write-Information "      Old: $($previousValues[$server])" -InformationAction Continue
+                            Write-Information "      New: $value" -InformationAction Continue
                         }
                         elseif (-not $Quiet) {
                             $status = if ($value) { "✓" } else { "✗" }
-                            Write-Host "  $status $server : $value" -ForegroundColor White
+                            Write-Information "  $status $server : $value" -InformationAction Continue
                         }
 
                         # Check against expected value
                         if ($ExpectedValue) {
                             if ($value -eq $ExpectedValue) {
                                 $matchExpected++
-                            }
-                            else {
-                                $valuesMatch = $false
                             }
                         }
 
@@ -205,9 +201,8 @@ function Watch-M365DnsPropagation {
                     catch {
                         Write-Verbose "Failed to query $server : $_"
                         if (-not $Quiet) {
-                            Write-Host "  ✗ $server : Query failed" -ForegroundColor Red
+                            Write-Information "  ✗ $server : Query failed" -InformationAction Continue
                         }
-                        $valuesMatch = $false
                     }
                 }
 
@@ -216,24 +211,24 @@ function Watch-M365DnsPropagation {
                     $propagationPct = [math]::Round(($matchExpected / $Resolver.Count) * 100)
 
                     if ($propagationPct -lt 100) {
-                        Write-Host "`n  Propagation: $propagationPct% ($matchExpected/$($Resolver.Count) resolvers)" -ForegroundColor Yellow
+                        Write-Information "`n  Propagation: $propagationPct% ($matchExpected/$($Resolver.Count) resolvers)" -InformationAction Continue
                     }
                     else {
-                        Write-Host "`n  ✓ Propagation: 100% (All resolvers match expected value!)" -ForegroundColor Green
+                        Write-Information "`n  ✓ Propagation: 100% (All resolvers match expected value!)" -InformationAction Continue
                         $allMatch = $true
                     }
                 }
 
                 # Exit if all match expected (and expected was provided)
                 if ($ExpectedValue -and $allMatch) {
-                    Write-Host "`n🎉 DNS propagation complete! All resolvers now return the expected value." -ForegroundColor Green
+                    Write-Information "`n🎉 DNS propagation complete! All resolvers now return the expected value." -InformationAction Continue
                     break
                 }
 
                 # Wait for next check
                 if (-not $allMatch) {
                     if (-not $Quiet) {
-                        Write-Host "`n  Next check in $Interval seconds..." -ForegroundColor DarkGray
+                        Write-Information "`n  Next check in $Interval seconds..." -InformationAction Continue
                     }
                     Start-Sleep -Seconds $Interval
                 }
@@ -243,31 +238,31 @@ function Watch-M365DnsPropagation {
             $endTime = Get-Date
             $totalDuration = $endTime - $startTime
 
-            Write-Host "`n" -NoNewline
-            Write-Host ("=" * 80) -ForegroundColor Cyan
-            Write-Host "`n=== Monitoring Summary ===" -ForegroundColor Cyan
-            Write-Host "Total Checks: $checkCount" -ForegroundColor White
-            Write-Host "Changes Detected: $changeCount" -ForegroundColor White
-            Write-Host "Duration: $($totalDuration.ToString('hh\:mm\:ss'))" -ForegroundColor White
+            Write-Information "" -InformationAction Continue
+            Write-Information ("=" * 80) -InformationAction Continue
+            Write-Information "`n=== Monitoring Summary ===" -InformationAction Continue
+            Write-Information "Total Checks: $checkCount" -InformationAction Continue
+            Write-Information "Changes Detected: $changeCount" -InformationAction Continue
+            Write-Information "Duration: $($totalDuration.ToString('hh\:mm\:ss'))" -InformationAction Continue
 
             if ($ExpectedValue -and $allMatch) {
-                Write-Host "Status: ✓ Propagation Complete" -ForegroundColor Green
+                Write-Information "Status: ✓ Propagation Complete" -InformationAction Continue
             }
             elseif ($ExpectedValue) {
-                Write-Host "Status: ⚠️  Still Propagating" -ForegroundColor Yellow
+                Write-Information "Status: ⚠️  Still Propagating" -InformationAction Continue
             }
             else {
-                Write-Host "Status: Monitoring Stopped" -ForegroundColor White
+                Write-Information "Status: Monitoring Stopped" -InformationAction Continue
             }
 
-            Write-Host "`nFinal Values:" -ForegroundColor Cyan
+            Write-Information "`nFinal Values:" -InformationAction Continue
             foreach ($server in $Resolver) {
                 if ($currentResults.ContainsKey($server)) {
-                    Write-Host "  $server : $($currentResults[$server])" -ForegroundColor White
+                    Write-Information "  $server : $($currentResults[$server])" -InformationAction Continue
                 }
             }
 
-            Write-Host ""
+            Write-Information "" -InformationAction Continue
         }
         catch {
             Write-Error "DNS monitoring failed: $_"
