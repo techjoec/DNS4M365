@@ -3,7 +3,7 @@
     RootModule = 'DNS4M365.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.2.0'
+    ModuleVersion = '1.3.0'
 
     # ID used to uniquely identify this module
     GUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
@@ -18,7 +18,7 @@
     Copyright = '(c) 2025. All rights reserved.'
 
     # Description of the functionality provided by this module
-    Description = 'Simplified PowerShell module for Microsoft 365 DNS validation and monitoring. Validates DNS compliance against Microsoft Graph API, monitors DNS propagation in real-time, and provides comprehensive health checks for M365 custom domains. Supports DNS-over-HTTPS, baseline/diff mode, and multiple output formats.'
+    Description = 'Comprehensive PowerShell module for Microsoft 365 DNS validation and monitoring. Validates DNS compliance against Microsoft Graph API and Exchange Online, monitors DNS propagation in real-time, and provides comprehensive health checks for M365 custom domains. Supports automatic DKIM validation, DMARC generation, MTA-STS validation, CSV-based offline validation, DNS-over-HTTPS, baseline/diff mode, and multiple output formats.'
 
     # Minimum version of the PowerShell engine required by this module
     PowerShellVersion = '5.1'
@@ -26,7 +26,8 @@
     # Modules that must be imported into the global environment prior to importing this module
     RequiredModules = @(
         @{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '2.0.0'},
-        @{ModuleName = 'Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion = '2.0.0'}
+        @{ModuleName = 'Microsoft.Graph.Identity.DirectoryManagement'; ModuleVersion = '2.0.0'},
+        @{ModuleName = 'ExchangeOnlineManagement'; ModuleVersion = '3.0.0'}
     )
 
     # Functions to export from this module
@@ -34,7 +35,8 @@
         'Test-M365DnsCompliance',
         'Compare-M365DnsRecord',
         'Watch-M365DnsPropagation',
-        'Export-M365DomainReport'
+        'Export-M365DomainReport',
+        'New-M365DmarcRecord'
     )
 
     # Cmdlets to export from this module
@@ -53,6 +55,24 @@
             LicenseUri = 'https://github.com/yourusername/DNS4M365/blob/main/LICENSE'
             ProjectUri = 'https://github.com/yourusername/DNS4M365'
             ReleaseNotes = @'
+Version 1.3.0 (2025-01-06) - Exchange Online Integration & Enhanced Features:
+NEW FEATURES:
+- Automatic DKIM validation via Exchange Online PowerShell (Get-DkimSigningConfig)
+- CSV-based offline validation (validate without live API access)
+- New-M365DmarcRecord cmdlet for DMARC policy generation
+- MTA-STS validation support
+- Comprehensive permissions documentation in README
+
+DEPENDENCIES:
+- Added ExchangeOnlineManagement module (v3.0.0+)
+- Requires Exchange Online admin permissions for DKIM validation
+- Graph API permissions clearly documented
+
+CSV TEMPLATE:
+- Template CSV for offline validation scenarios
+- Use -CSVPath parameter to skip live API queries
+- Ideal for testing or restricted environments
+
 Version 1.2.0 (2025-01-06) - KISS Architecture Simplification:
 BREAKING CHANGES:
 - Removed wrapper functions: Use Microsoft.Graph cmdlets directly (Connect-MgGraph, Get-MgDomain, etc.)
