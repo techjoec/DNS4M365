@@ -3,7 +3,7 @@
     RootModule = 'DNS4M365.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.1.0'
+    ModuleVersion = '1.2.0'
 
     # ID used to uniquely identify this module
     GUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
@@ -18,7 +18,7 @@
     Copyright = '(c) 2025. All rights reserved.'
 
     # Description of the functionality provided by this module
-    Description = 'PowerShell module for querying and managing Microsoft 365 domain DNS records. Enumerates domains, retrieves DNS records (MX, CNAME, TXT, SRV, DMARC), and provides comprehensive domain verification status.'
+    Description = 'Simplified PowerShell module for Microsoft 365 DNS validation and monitoring. Validates DNS compliance against Microsoft Graph API, monitors DNS propagation in real-time, and provides comprehensive health checks for M365 custom domains. Supports DNS-over-HTTPS, baseline/diff mode, and multiple output formats.'
 
     # Minimum version of the PowerShell engine required by this module
     PowerShellVersion = '5.1'
@@ -31,15 +31,10 @@
 
     # Functions to export from this module
     FunctionsToExport = @(
-        'Connect-M365DNS',
-        'Get-M365Domain',
-        'Get-M365DomainDNSRecord',
-        'Get-M365DomainVerificationRecord',
-        'Export-M365DomainReport',
-        'Test-M365DomainVerification',
-        'Get-M365DomainDNSHealth',
-        'Compare-M365DomainDNS',
-        'Get-M365DomainReadiness'
+        'Test-M365DnsCompliance',
+        'Compare-M365DnsRecord',
+        'Watch-M365DnsPropagation',
+        'Export-M365DomainReport'
     )
 
     # Cmdlets to export from this module
@@ -58,21 +53,33 @@
             LicenseUri = 'https://github.com/yourusername/DNS4M365/blob/main/LICENSE'
             ProjectUri = 'https://github.com/yourusername/DNS4M365'
             ReleaseNotes = @'
+Version 1.2.0 (2025-01-06) - KISS Architecture Simplification:
+BREAKING CHANGES:
+- Removed wrapper functions: Use Microsoft.Graph cmdlets directly (Connect-MgGraph, Get-MgDomain, etc.)
+- Consolidated 3 validation functions into Test-M365DnsCompliance (Health/Readiness/Verification)
+- Renamed Compare-M365DomainDNS → Compare-M365DnsRecord (singular parameter names)
+- Simplified DNS queries: Native Resolve-DnsName for standard, Invoke-WebRequest for DoH only
+
+NEW FEATURES:
+- Watch-M365DnsPropagation: Real-time DNS propagation monitoring across multiple resolvers
+- Baseline/Diff mode: Save DNS snapshots and compare changes over time
+- Configurable DNS query methods: Standard DNS or DNS-over-HTTPS per-call
+- Enhanced comparison with legacy format detection (MX, DKIM)
+- Comprehensive compliance scoring and recommendations
+
+SIMPLIFIED ARCHITECTURE:
+- Reduced from 9+ functions to 4 core functions (KISS principle)
+- Direct Microsoft.Graph dependency - no unnecessary wrappers
+- Use native PowerShell cmdlets where possible (Export-Csv, ConvertTo-Json)
+- Parameter-based configuration (no state management)
+
 Version 1.1.0 (2025-01-06):
-- Enhanced DNS health checks with current Microsoft 365 best practices
-- Added Get-M365DomainReadiness function for DNS compliance assessment
-- Added detection for MX record formats (modern vs legacy)
-- Added detection for DKIM formats (modern vs legacy)
-- Added email authentication compliance validation (SPF/DMARC)
-- Enhanced deprecated record detection (msoid, legacy Skype for Business)
-- Updated regional endpoint detection (GCC High, DoD, 21Vianet)
-- Added Teams-only vs hybrid Skype for Business detection
-- Enhanced comparison function with format detection and recommendations
-- Overall DNS compliance scoring and action priority assignment
-- DNS-over-HTTPS support using Google Public DNS for consistent DNS lookups
+- DNS-over-HTTPS support using Google Public DNS
+- Enhanced health checks and compliance assessment
+- MX/DKIM format detection (modern vs legacy)
 
 Version 1.0.0 (2025-01-05):
-- Initial release - Domain enumeration and DNS record retrieval functionality
+- Initial release - Domain enumeration and DNS record retrieval
 '@
         }
     }

@@ -69,7 +69,7 @@ function Export-M365DomainReport {
         # Check if connected to Microsoft Graph
         $context = Get-MgContext
         if (-not $context) {
-            throw "Not connected to Microsoft Graph. Please run Connect-M365DNS first."
+            throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
         }
 
         # Verify output path exists
