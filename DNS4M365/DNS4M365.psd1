@@ -39,7 +39,7 @@
         'Test-M365DomainVerification',
         'Get-M365DomainDNSHealth',
         'Compare-M365DomainDNS',
-        'Get-M365DomainMigrationStatus'
+        'Get-M365DomainReadiness'
     )
 
     # Cmdlets to export from this module
@@ -59,15 +59,16 @@
             ProjectUri = 'https://github.com/yourusername/DNS4M365'
             ReleaseNotes = @'
 Version 1.1.0 (2025-01-06):
-- Enhanced DNS health checks with 2024-2025 Microsoft 365 updates
-- Added detection for new mx.microsoft MX record format (July-August 2025 migration)
-- Added detection for new dkim.mail.microsoft DKIM format (May 2025+)
-- Added critical warnings for mandatory email authentication (SPF/DMARC - April 2025)
+- Enhanced DNS health checks with current Microsoft 365 best practices
+- Added Get-M365DomainReadiness function for DNS compliance assessment
+- Added detection for MX record formats (modern vs legacy)
+- Added detection for DKIM formats (modern vs legacy)
+- Added email authentication compliance validation (SPF/DMARC)
 - Enhanced deprecated record detection (msoid, legacy Skype for Business)
-- Added Get-M365DomainMigrationStatus function for migration readiness assessment
 - Updated regional endpoint detection (GCC High, DoD, 21Vianet)
 - Added Teams-only vs hybrid Skype for Business detection
-- Enhanced comparison function with legacy format warnings
+- Enhanced comparison function with format detection and recommendations
+- Overall DNS compliance scoring and action priority assignment
 
 Version 1.0.0 (2025-01-05):
 - Initial release - Domain enumeration and DNS record retrieval functionality

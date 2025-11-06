@@ -9,13 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### New Function: Get-M365DomainMigrationStatus
-- Comprehensive migration readiness assessment for 2024-2025 Microsoft 365 DNS updates
+#### New Function: Get-M365DomainReadiness
+- Comprehensive DNS compliance assessment for 2024-2025 Microsoft 365 DNS updates
 - Evaluates MX record format (legacy `mail.protection.outlook.com` vs modern `mx.microsoft`)
 - Evaluates DKIM format (legacy `onmicrosoft.com` vs new `dkim.mail.microsoft`)
 - Assesses email authentication readiness (SPF/DMARC mandatory April 2025)
 - Detects deprecated records (msoid, legacy Skype for Business)
-- Calculates overall migration readiness percentage
+- Calculates overall DNS compliance percentage
 - Assigns migration priority (CRITICAL/High/Medium/Low)
 - Exports comprehensive migration reports to CSV
 - Provides actionable recommendations per domain
@@ -62,11 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Module version bumped from 1.0.0 to 1.1.0
 - Module manifest (DNS4M365.psd1) updated with:
   - Version 1.1.0
-  - Added `Get-M365DomainMigrationStatus` to FunctionsToExport
+  - Added `Get-M365DomainReadiness` to FunctionsToExport
   - Comprehensive release notes for v1.1.0
 - README.md updated with:
   - "What's New in v1.1.0" section highlighting 2024-2025 enhancements
-  - Documentation for `Get-M365DomainMigrationStatus` function
+  - Documentation for `Get-M365DomainReadiness` function
   - Example 5: Migration Readiness Assessment
   - Updated roadmap showing completed features
 - Function descriptions enhanced with 2024-2025 context

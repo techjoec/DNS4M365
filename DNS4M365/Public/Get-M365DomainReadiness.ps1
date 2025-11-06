@@ -1,43 +1,52 @@
-function Get-M365DomainMigrationStatus {
+function Get-M365DomainReadiness {
     <#
     .SYNOPSIS
-        Assesses domain readiness for 2024-2025 Microsoft 365 DNS migrations.
+        Assesses Microsoft 365 domain DNS configuration compliance and readiness.
 
     .DESCRIPTION
-        Evaluates custom domain DNS configuration against latest Microsoft 365 requirements
-        and identifies necessary migrations:
-        - MX record migration to mx.microsoft format (July-August 2025)
-        - DKIM migration to new dkim.mail.microsoft format (May 2025+)
-        - Email authentication mandates (SPF/DMARC mandatory April 2025)
-        - Deprecated record removal (msoid, legacy Skype for Business)
-        - cloud.microsoft domain consolidation (April 2025)
+        Evaluates custom domain DNS configuration against current Microsoft 365 best practices
+        and requirements. Identifies configuration issues, format compliance, and provides
+        recommendations for optimal DNS setup.
+
+        Checks performed:
+        - MX record format validation (detects legacy vs modern formats)
+        - DKIM configuration and format validation
+        - Email authentication compliance (SPF/DMARC requirements)
+        - Deprecated record detection (msoid, legacy Skype for Business)
+        - Overall DNS health and compliance scoring
+
+        Use cases:
+        - Regular DNS compliance auditing
+        - Configuration validation
+        - Security posture assessment
+        - Change planning and impact analysis
 
     .PARAMETER DomainName
         The domain name(s) to assess. If not specified, assesses all verified domains.
 
     .PARAMETER ShowRecommendations
-        Display detailed migration recommendations for each domain.
+        Display detailed recommendations for improving DNS configuration.
 
     .PARAMETER ExportReport
-        Export migration status report to CSV file.
+        Export assessment report to CSV file.
 
     .PARAMETER OutputPath
         Path for exported report file (default: current directory).
 
     .EXAMPLE
-        Get-M365DomainMigrationStatus -DomainName "contoso.com"
-        Assesses migration status for contoso.com.
+        Get-M365DomainReadiness -DomainName "contoso.com"
+        Assesses DNS configuration for contoso.com.
 
     .EXAMPLE
-        Get-M365DomainMigrationStatus -ShowRecommendations
-        Assesses all domains with detailed migration recommendations.
+        Get-M365DomainReadiness -ShowRecommendations
+        Assesses all domains with detailed recommendations.
 
     .EXAMPLE
-        Get-M365DomainMigrationStatus -ExportReport -OutputPath "C:\Reports"
-        Assesses all domains and exports migration report.
+        Get-M365DomainReadiness -ExportReport -OutputPath "C:\Reports"
+        Assesses all domains and exports compliance report.
 
     .OUTPUTS
-        Custom object array containing migration status and recommendations.
+        Custom object array containing DNS configuration assessment and recommendations.
     #>
 
     [CmdletBinding()]
@@ -56,7 +65,7 @@ function Get-M365DomainMigrationStatus {
     )
 
     begin {
-        Write-Verbose "Starting migration status assessment"
+        Write-Verbose "Starting DNS readiness assessment"
 
         # Check if connected to Microsoft Graph
         $context = Get-MgContext
@@ -64,7 +73,7 @@ function Get-M365DomainMigrationStatus {
             throw "Not connected to Microsoft Graph. Please run Connect-M365DNS first."
         }
 
-        $migrationResults = @()
+        $assessmentResults = @()
     }
 
     process {
@@ -77,17 +86,17 @@ function Get-M365DomainMigrationStatus {
             }
 
             foreach ($domain in $DomainName) {
-                Write-Host "`nAssessing migration status for: $domain" -ForegroundColor Cyan
+                Write-Host "`nAssessing DNS readiness for: $domain" -ForegroundColor Cyan
 
-                $migrationStatus = [PSCustomObject]@{
+                $domainStatus = [PSCustomObject]@{
                     Domain = $domain
                     OverallReadiness = 0
                     MXStatus = "Unknown"
                     MXFormat = "Unknown"
-                    MXNeedsMigration = $false
+                    UsingLegacyMX = $false
                     DKIMStatus = "Unknown"
                     DKIMFormat = "Unknown"
-                    DKIMNeedsMigration = $false
+                    UsingLegacyDKIM = $false
                     EmailAuthStatus = "Unknown"
                     SPFConfigured = $false
                     DMARCConfigured = $false
@@ -96,7 +105,7 @@ function Get-M365DomainMigrationStatus {
                     LegacyTeamsRecords = @()
                     CriticalActions = @()
                     Recommendations = @()
-                    MigrationPriority = "Unknown"
+                    ActionPriority = "Unknown"
                 }
 
                 # 1. Check MX Record Format
@@ -107,36 +116,36 @@ function Get-M365DomainMigrationStatus {
                         $primaryMX = $mxRecords | Sort-Object Preference | Select-Object -First 1
 
                         if ($primaryMX.NameExchange -like "*.mx.microsoft") {
-                            $migrationStatus.MXStatus = "Modern"
-                            $migrationStatus.MXFormat = "mx.microsoft (current)"
-                            $migrationStatus.MXNeedsMigration = $false
+                            $domainStatus.MXStatus = "Modern"
+                            $domainStatus.MXFormat = "mx.microsoft (current)"
+                            $domainStatus.UsingLegacyMX = $false
                         }
                         elseif ($primaryMX.NameExchange -like "*.mail.protection.outlook.com") {
-                            $migrationStatus.MXStatus = "Legacy"
-                            $migrationStatus.MXFormat = "mail.protection.outlook.com (legacy)"
-                            $migrationStatus.MXNeedsMigration = $true
-                            $migrationStatus.CriticalActions += "Migrate MX record to mx.microsoft format (Message Center MC1048624, July-August 2025)"
+                            $domainStatus.MXStatus = "Legacy"
+                            $domainStatus.MXFormat = "mail.protection.outlook.com (legacy)"
+                            $domainStatus.UsingLegacyMX = $true
+                            $domainStatus.CriticalActions += "Migrate MX record to mx.microsoft format (Message Center MC1048624, July-August 2025)"
                         }
                         elseif ($primaryMX.NameExchange -like "*.mail.protection.office365.us" -or
                                 $primaryMX.NameExchange -like "*.protection.office365.us") {
-                            $migrationStatus.MXStatus = "Government Cloud"
-                            $migrationStatus.MXFormat = "office365.us (GCC/DoD)"
-                            $migrationStatus.MXNeedsMigration = $false
+                            $domainStatus.MXStatus = "Government Cloud"
+                            $domainStatus.MXFormat = "office365.us (GCC/DoD)"
+                            $domainStatus.UsingLegacyMX = $false
                         }
                         elseif ($primaryMX.NameExchange -like "*.mail.protection.partner.outlook.cn") {
-                            $migrationStatus.MXStatus = "21Vianet China"
-                            $migrationStatus.MXFormat = "partner.outlook.cn (21Vianet)"
-                            $migrationStatus.MXNeedsMigration = $false
+                            $domainStatus.MXStatus = "21Vianet China"
+                            $domainStatus.MXFormat = "partner.outlook.cn (21Vianet)"
+                            $domainStatus.UsingLegacyMX = $false
                         }
                         else {
-                            $migrationStatus.MXStatus = "Non-Microsoft"
-                            $migrationStatus.MXFormat = "Third-party or hybrid"
-                            $migrationStatus.MXNeedsMigration = $false
+                            $domainStatus.MXStatus = "Non-Microsoft"
+                            $domainStatus.MXFormat = "Third-party or hybrid"
+                            $domainStatus.UsingLegacyMX = $false
                         }
                     }
                     else {
-                        $migrationStatus.MXStatus = "Missing"
-                        $migrationStatus.CriticalActions += "Configure MX record for Microsoft 365"
+                        $domainStatus.MXStatus = "Missing"
+                        $domainStatus.CriticalActions += "Configure MX record for Microsoft 365"
                     }
                 }
                 catch {
@@ -159,20 +168,20 @@ function Get-M365DomainMigrationStatus {
                                          ($selector2 -and $selector2.NameHost -like "*._domainkey.*.onmicrosoft.com")
 
                         if ($isNewFormat) {
-                            $migrationStatus.DKIMStatus = "Modern"
-                            $migrationStatus.DKIMFormat = "dkim.mail.microsoft (current)"
-                            $migrationStatus.DKIMNeedsMigration = $false
+                            $domainStatus.DKIMStatus = "Modern"
+                            $domainStatus.DKIMFormat = "dkim.mail.microsoft (current)"
+                            $domainStatus.UsingLegacyDKIM = $false
                         }
                         elseif ($isLegacyFormat) {
-                            $migrationStatus.DKIMStatus = "Legacy"
-                            $migrationStatus.DKIMFormat = "onmicrosoft.com (legacy)"
-                            $migrationStatus.DKIMNeedsMigration = $true
-                            $migrationStatus.Recommendations += "DKIM using legacy format - new deployments use dkim.mail.microsoft (May 2025+)"
+                            $domainStatus.DKIMStatus = "Legacy"
+                            $domainStatus.DKIMFormat = "onmicrosoft.com (legacy)"
+                            $domainStatus.UsingLegacyDKIM = $true
+                            $domainStatus.Recommendations += "DKIM using legacy format - new deployments use dkim.mail.microsoft (May 2025+)"
                         }
                     }
                     else {
-                        $migrationStatus.DKIMStatus = "Not Configured"
-                        $migrationStatus.Recommendations += "Configure DKIM signing for improved email authentication"
+                        $domainStatus.DKIMStatus = "Not Configured"
+                        $domainStatus.Recommendations += "Configure DKIM signing for improved email authentication"
                     }
                 }
                 catch {
@@ -188,35 +197,35 @@ function Get-M365DomainMigrationStatus {
 
                     if ($spfRecord) {
                         $spfText = $spfRecord.Strings -join ""
-                        $migrationStatus.SPFConfigured = $true
+                        $domainStatus.SPFConfigured = $true
 
                         if ($spfText -notlike "*spf.protection.outlook.com*" -and $spfText -notlike "*spf.protection.office365.us*") {
-                            $migrationStatus.CriticalActions += "SPF record does not include Microsoft 365 - MANDATORY for April 2025"
+                            $domainStatus.CriticalActions += "SPF record does not include Microsoft 365 - MANDATORY for April 2025"
                         }
                     }
                     else {
-                        $migrationStatus.SPFConfigured = $false
-                        $migrationStatus.CriticalActions += "CRITICAL: No SPF record found - MANDATORY for email authentication (April 2025)"
+                        $domainStatus.SPFConfigured = $false
+                        $domainStatus.CriticalActions += "CRITICAL: No SPF record found - MANDATORY for email authentication (April 2025)"
                     }
 
                     # Check DMARC
                     $dmarcRecord = Resolve-DnsName -Name "_dmarc.$domain" -Type TXT -ErrorAction SilentlyContinue
                     if ($dmarcRecord) {
-                        $migrationStatus.DMARCConfigured = $true
+                        $domainStatus.DMARCConfigured = $true
                         $dmarcText = $dmarcRecord.Strings -join ""
 
                         if ($dmarcText -like "*p=none*") {
-                            $migrationStatus.Recommendations += "DMARC policy is 'none' - upgrade to 'quarantine' or 'reject' for April 2025 compliance"
+                            $domainStatus.Recommendations += "DMARC policy is 'none' - upgrade to 'quarantine' or 'reject' for April 2025 compliance"
                         }
                     }
                     else {
-                        $migrationStatus.DMARCConfigured = $false
-                        $migrationStatus.CriticalActions += "CRITICAL: No DMARC record found - MANDATORY with policy p=quarantine or p=reject (April 2025)"
+                        $domainStatus.DMARCConfigured = $false
+                        $domainStatus.CriticalActions += "CRITICAL: No DMARC record found - MANDATORY with policy p=quarantine or p=reject (April 2025)"
                     }
 
-                    $migrationStatus.EmailAuthReady = $migrationStatus.SPFConfigured -and $migrationStatus.DMARCConfigured
-                    $migrationStatus.EmailAuthStatus = if ($migrationStatus.EmailAuthReady) { "Ready" }
-                                                       elseif ($migrationStatus.SPFConfigured -or $migrationStatus.DMARCConfigured) { "Partial" }
+                    $domainStatus.EmailAuthReady = $domainStatus.SPFConfigured -and $domainStatus.DMARCConfigured
+                    $domainStatus.EmailAuthStatus = if ($domainStatus.EmailAuthReady) { "Ready" }
+                                                       elseif ($domainStatus.SPFConfigured -or $domainStatus.DMARCConfigured) { "Partial" }
                                                        else { "Not Ready" }
                 }
                 catch {
@@ -229,8 +238,8 @@ function Get-M365DomainMigrationStatus {
                     # Check msoid (CRITICAL - blocks M365 Apps)
                     $msoid = Resolve-DnsName -Name "msoid.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($msoid) {
-                        $migrationStatus.DeprecatedRecords += "msoid.$domain"
-                        $migrationStatus.CriticalActions += "CRITICAL: Remove msoid.$domain CNAME - BLOCKS Microsoft 365 Apps activation"
+                        $domainStatus.DeprecatedRecords += "msoid.$domain"
+                        $domainStatus.CriticalActions += "CRITICAL: Remove msoid.$domain CNAME - BLOCKS Microsoft 365 Apps activation"
                     }
                 }
                 catch {
@@ -242,20 +251,20 @@ function Get-M365DomainMigrationStatus {
                 try {
                     $sip = Resolve-DnsName -Name "sip.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($sip) {
-                        $migrationStatus.LegacyTeamsRecords += "sip.$domain CNAME"
-                        $migrationStatus.Recommendations += "sip.$domain CNAME is legacy (Skype for Business) - not required for Teams-only tenants"
+                        $domainStatus.LegacyTeamsRecords += "sip.$domain CNAME"
+                        $domainStatus.Recommendations += "sip.$domain CNAME is legacy (Skype for Business) - not required for Teams-only tenants"
                     }
 
                     $lyncdiscover = Resolve-DnsName -Name "lyncdiscover.$domain" -Type CNAME -ErrorAction SilentlyContinue
                     if ($lyncdiscover) {
-                        $migrationStatus.LegacyTeamsRecords += "lyncdiscover.$domain CNAME"
-                        $migrationStatus.Recommendations += "lyncdiscover.$domain CNAME is legacy (Skype for Business) - not required for Teams-only tenants"
+                        $domainStatus.LegacyTeamsRecords += "lyncdiscover.$domain CNAME"
+                        $domainStatus.Recommendations += "lyncdiscover.$domain CNAME is legacy (Skype for Business) - not required for Teams-only tenants"
                     }
 
                     $sipTLS = Resolve-DnsName -Name "_sip._tls.$domain" -Type SRV -ErrorAction SilentlyContinue
                     if ($sipTLS) {
-                        $migrationStatus.LegacyTeamsRecords += "_sip._tls.$domain SRV"
-                        $migrationStatus.Recommendations += "_sip._tls.$domain SRV is legacy - Teams-only needs _sipfederationtls._tcp only"
+                        $domainStatus.LegacyTeamsRecords += "_sip._tls.$domain SRV"
+                        $domainStatus.Recommendations += "_sip._tls.$domain SRV is legacy - Teams-only needs _sipfederationtls._tcp only"
                     }
                 }
                 catch {
@@ -267,115 +276,115 @@ function Get-M365DomainMigrationStatus {
                 $totalPoints = 5
 
                 # MX modern format (1 point)
-                if ($migrationStatus.MXStatus -eq "Modern" -or $migrationStatus.MXStatus -eq "Government Cloud" -or $migrationStatus.MXStatus -eq "21Vianet China") {
+                if ($domainStatus.MXStatus -eq "Modern" -or $domainStatus.MXStatus -eq "Government Cloud" -or $domainStatus.MXStatus -eq "21Vianet China") {
                     $readinessPoints++
                 }
 
                 # DKIM configured (1 point)
-                if ($migrationStatus.DKIMStatus -ne "Not Configured") {
+                if ($domainStatus.DKIMStatus -ne "Not Configured") {
                     $readinessPoints++
                 }
 
                 # Email authentication ready (2 points - critical for April 2025)
-                if ($migrationStatus.SPFConfigured) { $readinessPoints++ }
-                if ($migrationStatus.DMARCConfigured) { $readinessPoints++ }
+                if ($domainStatus.SPFConfigured) { $readinessPoints++ }
+                if ($domainStatus.DMARCConfigured) { $readinessPoints++ }
 
                 # No deprecated records (1 point)
-                if ($migrationStatus.DeprecatedRecords.Count -eq 0) {
+                if ($domainStatus.DeprecatedRecords.Count -eq 0) {
                     $readinessPoints++
                 }
 
-                $migrationStatus.OverallReadiness = [math]::Round(($readinessPoints / $totalPoints) * 100, 0)
+                $domainStatus.OverallReadiness = [math]::Round(($readinessPoints / $totalPoints) * 100, 0)
 
-                # Determine Migration Priority
-                if ($migrationStatus.DeprecatedRecords.Count -gt 0 -or -not $migrationStatus.EmailAuthReady) {
-                    $migrationStatus.MigrationPriority = "CRITICAL"
+                # Determine Action Priority
+                if ($domainStatus.DeprecatedRecords.Count -gt 0 -or -not $domainStatus.EmailAuthReady) {
+                    $domainStatus.ActionPriority = "CRITICAL"
                 }
-                elseif ($migrationStatus.MXNeedsMigration -or $migrationStatus.DKIMNeedsMigration) {
-                    $migrationStatus.MigrationPriority = "High"
+                elseif ($domainStatus.UsingLegacyMX -or $domainStatus.UsingLegacyDKIM) {
+                    $domainStatus.ActionPriority = "High"
                 }
-                elseif ($migrationStatus.LegacyTeamsRecords.Count -gt 0) {
-                    $migrationStatus.MigrationPriority = "Medium"
+                elseif ($domainStatus.LegacyTeamsRecords.Count -gt 0) {
+                    $domainStatus.ActionPriority = "Medium"
                 }
                 else {
-                    $migrationStatus.MigrationPriority = "Low"
+                    $domainStatus.ActionPriority = "Low"
                 }
 
                 # Display summary
-                $readinessColor = switch ($migrationStatus.OverallReadiness) {
+                $readinessColor = switch ($domainStatus.OverallReadiness) {
                     { $_ -ge 80 } { "Green" }
                     { $_ -ge 60 } { "Yellow" }
                     { $_ -ge 40 } { "Magenta" }
                     default { "Red" }
                 }
 
-                Write-Host "  Overall Readiness: $($migrationStatus.OverallReadiness)%" -ForegroundColor $readinessColor
-                Write-Host "  Migration Priority: $($migrationStatus.MigrationPriority)" -ForegroundColor $(
-                    switch ($migrationStatus.MigrationPriority) {
+                Write-Host "  Overall Readiness: $($domainStatus.OverallReadiness)%" -ForegroundColor $readinessColor
+                Write-Host "  Action Priority: $($domainStatus.ActionPriority)" -ForegroundColor $(
+                    switch ($domainStatus.ActionPriority) {
                         "CRITICAL" { "Red" }
                         "High" { "Magenta" }
                         "Medium" { "Yellow" }
                         default { "Green" }
                     }
                 )
-                Write-Host "  MX Format: $($migrationStatus.MXFormat)" -ForegroundColor White
-                Write-Host "  DKIM Format: $($migrationStatus.DKIMFormat)" -ForegroundColor White
-                Write-Host "  Email Auth Status: $($migrationStatus.EmailAuthStatus)" -ForegroundColor White
+                Write-Host "  MX Format: $($domainStatus.MXFormat)" -ForegroundColor White
+                Write-Host "  DKIM Format: $($domainStatus.DKIMFormat)" -ForegroundColor White
+                Write-Host "  Email Auth Status: $($domainStatus.EmailAuthStatus)" -ForegroundColor White
 
-                if ($migrationStatus.CriticalActions.Count -gt 0) {
+                if ($domainStatus.CriticalActions.Count -gt 0) {
                     Write-Host "`n  Critical Actions Required:" -ForegroundColor Red
-                    $migrationStatus.CriticalActions | ForEach-Object { Write-Host "    - $_" -ForegroundColor Red }
+                    $domainStatus.CriticalActions | ForEach-Object { Write-Host "    - $_" -ForegroundColor Red }
                 }
 
-                if ($ShowRecommendations -and $migrationStatus.Recommendations.Count -gt 0) {
+                if ($ShowRecommendations -and $domainStatus.Recommendations.Count -gt 0) {
                     Write-Host "`n  Recommendations:" -ForegroundColor Cyan
-                    $migrationStatus.Recommendations | ForEach-Object { Write-Host "    - $_" -ForegroundColor Cyan }
+                    $domainStatus.Recommendations | ForEach-Object { Write-Host "    - $_" -ForegroundColor Cyan }
                 }
 
-                if ($migrationStatus.DeprecatedRecords.Count -gt 0) {
+                if ($domainStatus.DeprecatedRecords.Count -gt 0) {
                     Write-Host "`n  Deprecated Records (REMOVE):" -ForegroundColor Magenta
-                    $migrationStatus.DeprecatedRecords | ForEach-Object { Write-Host "    - $_" -ForegroundColor Magenta }
+                    $domainStatus.DeprecatedRecords | ForEach-Object { Write-Host "    - $_" -ForegroundColor Magenta }
                 }
 
-                if ($migrationStatus.LegacyTeamsRecords.Count -gt 0) {
+                if ($domainStatus.LegacyTeamsRecords.Count -gt 0) {
                     Write-Host "`n  Legacy Teams/Skype Records:" -ForegroundColor Yellow
-                    $migrationStatus.LegacyTeamsRecords | ForEach-Object { Write-Host "    - $_" -ForegroundColor Yellow }
+                    $domainStatus.LegacyTeamsRecords | ForEach-Object { Write-Host "    - $_" -ForegroundColor Yellow }
                 }
 
-                $migrationResults += $migrationStatus
+                $assessmentResults += $domainStatus
             }
 
             # Export report if requested
             if ($ExportReport) {
                 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-                $reportFile = Join-Path -Path $OutputPath -ChildPath "M365-Migration-Status-$timestamp.csv"
+                $reportFile = Join-Path -Path $OutputPath -ChildPath "M365-DNS-Readiness-$timestamp.csv"
 
-                $exportData = $migrationResults | Select-Object Domain, OverallReadiness, MigrationPriority,
+                $exportData = $assessmentResults | Select-Object Domain, OverallReadiness, ActionPriority,
                     MXStatus, MXFormat, DKIMStatus, DKIMFormat, EmailAuthStatus, SPFConfigured, DMARCConfigured,
                     @{N='CriticalActionsCount';E={$_.CriticalActions.Count}},
                     @{N='DeprecatedRecordsCount';E={$_.DeprecatedRecords.Count}},
                     @{N='LegacyRecordsCount';E={$_.LegacyTeamsRecords.Count}}
 
                 $exportData | Export-Csv -Path $reportFile -NoTypeInformation
-                Write-Host "`nMigration report exported to: $reportFile" -ForegroundColor Green
+                Write-Host "`nDNS readiness report exported to: $reportFile" -ForegroundColor Green
             }
 
             # Display summary statistics
-            Write-Host "`n=== Migration Status Summary ===" -ForegroundColor Cyan
-            $totalDomains = $migrationResults.Count
-            $criticalPriority = ($migrationResults | Where-Object { $_.MigrationPriority -eq "CRITICAL" }).Count
-            $highPriority = ($migrationResults | Where-Object { $_.MigrationPriority -eq "High" }).Count
-            $avgReadiness = [math]::Round(($migrationResults | Measure-Object -Property OverallReadiness -Average).Average, 0)
+            Write-Host "`n=== DNS Readiness Summary ===" -ForegroundColor Cyan
+            $totalDomains = $assessmentResults.Count
+            $criticalPriority = ($assessmentResults | Where-Object { $_.ActionPriority -eq "CRITICAL" }).Count
+            $highPriority = ($assessmentResults | Where-Object { $_.ActionPriority -eq "High" }).Count
+            $avgReadiness = [math]::Round(($assessmentResults | Measure-Object -Property OverallReadiness -Average).Average, 0)
 
             Write-Host "Total Domains Assessed: $totalDomains" -ForegroundColor White
             Write-Host "Average Readiness: $avgReadiness%" -ForegroundColor White
             Write-Host "CRITICAL Priority: $criticalPriority" -ForegroundColor Red
             Write-Host "High Priority: $highPriority" -ForegroundColor Magenta
 
-            return $migrationResults
+            return $assessmentResults
         }
         catch {
-            Write-Error "Failed to assess migration status: $_"
+            Write-Error "Failed to assess readiness: $_"
             throw
         }
     }

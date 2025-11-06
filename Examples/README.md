@@ -46,9 +46,9 @@ Advanced scenarios including:
 
 **Recommended for:** Understanding report formats, planning implementations
 
-#### [v1.1.0-Migration-Examples.md](v1.1.0-Migration-Examples.md) ⭐ NEW
-11 comprehensive migration assessment examples featuring v1.1.0 enhancements:
-- Migration readiness assessment with `Get-M365DomainMigrationStatus`
+#### [v1.1.0-Readiness-Examples.md](v1.1.0-Readiness-Examples.md) ⭐ NEW
+11 comprehensive DNS compliance assessment examples featuring v1.1.0 enhancements:
+- DNS compliance assessment with `Get-M365DomainReadiness`
 - Enhanced health checks with 2024-2025 DNS format detection
 - Legacy vs modern MX format comparison (mail.protection.outlook.com vs mx.microsoft)
 - Legacy vs modern DKIM format comparison (onmicrosoft.com vs dkim.mail.microsoft)
@@ -56,9 +56,9 @@ Advanced scenarios including:
 - Deprecated record detection (msoid, legacy Skype for Business)
 - Government Cloud configurations (GCC High, DoD)
 - Migration priority dashboards
-- Filtering and reporting for migration planning
+- Filtering and reporting for compliance tracking
 
-**Recommended for:** 2024-2025 migration planning, understanding latest features
+**Recommended for:** 2024-2025 compliance tracking, understanding latest features
 
 ## Quick Start
 
@@ -88,16 +88,16 @@ Get-M365DomainDNSHealth -DomainName "contoso.com" `
 ### 3. Migration Assessment (v1.1.0) ⭐ NEW
 ```powershell
 # Assess migration readiness for 2024-2025 DNS changes
-Get-M365DomainMigrationStatus -ShowRecommendations -ExportReport
+Get-M365DomainReadiness -ShowRecommendations -ExportReport
 
 # Filter critical domains
-$status = Get-M365DomainMigrationStatus
+$status = Get-M365DomainReadiness
 $status | Where-Object { $_.MigrationPriority -eq "CRITICAL" }
 ```
 
 ## What's New in v1.1.0
 
-### New Function: Get-M365DomainMigrationStatus
+### New Function: Get-M365DomainReadiness
 Comprehensive migration readiness assessment for 2024-2025 Microsoft 365 DNS updates:
 - MX format detection (legacy vs modern mx.microsoft)
 - DKIM format detection (legacy vs modern dkim.mail.microsoft)
@@ -110,7 +110,7 @@ Comprehensive migration readiness assessment for 2024-2025 Microsoft 365 DNS upd
 - **Get-M365DomainDNSHealth**: Added 2024-2025 format detection, April 2025 mandate warnings
 - **Compare-M365DomainDNS**: Added legacy format warnings, migration context
 
-See [v1.1.0-Migration-Examples.md](v1.1.0-Migration-Examples.md) for detailed examples.
+See [v1.1.0-Readiness-Examples.md](v1.1.0-Readiness-Examples.md) for detailed examples.
 
 ## Migration Timelines (2024-2025)
 
@@ -125,13 +125,13 @@ See [v1.1.0-Migration-Examples.md](v1.1.0-Migration-Examples.md) for detailed ex
 
 ### Security & Compliance
 - Email authentication validation (SPF, DMARC, DKIM) - [Advanced-Usage.ps1](Advanced-Usage.ps1)
-- Deprecated record detection - [v1.1.0-Migration-Examples.md](v1.1.0-Migration-Examples.md)
+- Deprecated record detection - [v1.1.0-Readiness-Examples.md](v1.1.0-Readiness-Examples.md)
 - Security compliance reports - [Mock-Reports.md](Mock-Reports.md)
 
 ### Migration Planning
-- Migration readiness assessment - [v1.1.0-Migration-Examples.md](v1.1.0-Migration-Examples.md)
-- Legacy vs modern format comparison - [v1.1.0-Migration-Examples.md](v1.1.0-Migration-Examples.md)
-- Priority domain filtering - [v1.1.0-Migration-Examples.md](v1.1.0-Migration-Examples.md)
+- DNS compliance assessment - [v1.1.0-Readiness-Examples.md](v1.1.0-Readiness-Examples.md)
+- Legacy vs modern format comparison - [v1.1.0-Readiness-Examples.md](v1.1.0-Readiness-Examples.md)
+- Priority domain filtering - [v1.1.0-Readiness-Examples.md](v1.1.0-Readiness-Examples.md)
 
 ### Auditing & Reporting
 - Comprehensive domain audits - [Advanced-Usage.ps1](Advanced-Usage.ps1)

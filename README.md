@@ -117,7 +117,7 @@ This guide covers:
 
 **Enhanced for 2024-2025 Microsoft 365 DNS Changes:**
 
-- **NEW:** `Get-M365DomainMigrationStatus` - Assess migration readiness for 2025 DNS updates
+- **NEW:** `Get-M365DomainReadiness` - Assess DNS compliance for 2025 DNS updates
 - **Enhanced MX Detection:** Identifies new `mx.microsoft` format (July-August 2025 migration)
 - **Enhanced DKIM Detection:** Identifies new `dkim.mail.microsoft` format (May 2025+)
 - **Mandatory Email Auth Warnings:** Critical alerts for SPF/DMARC requirements (April 2025)
@@ -247,23 +247,23 @@ Export-M365DomainReport -IncludeUnverified
 Export-M365DomainReport -OutputPath "C:\Reports" -ReportName "M365-Domains-Monthly" -Format All
 ```
 
-#### Migration Assessment (NEW in v1.1.0)
+#### DNS Compliance Assessment (NEW in v1.1.0)
 
-##### `Get-M365DomainMigrationStatus`
+##### `Get-M365DomainReadiness`
 Assesses domain readiness for 2024-2025 Microsoft 365 DNS migrations.
 
 ```powershell
 # Assess all domains
-Get-M365DomainMigrationStatus
+Get-M365DomainReadiness
 
 # Assess specific domain with recommendations
-Get-M365DomainMigrationStatus -DomainName "contoso.com" -ShowRecommendations
+Get-M365DomainReadiness -DomainName "contoso.com" -ShowRecommendations
 
 # Assess all domains and export report
-Get-M365DomainMigrationStatus -ExportReport -OutputPath "C:\Reports"
+Get-M365DomainReadiness -ExportReport -OutputPath "C:\Reports"
 
 # Get detailed migration recommendations
-Get-M365DomainMigrationStatus -ShowRecommendations
+Get-M365DomainReadiness -ShowRecommendations
 ```
 
 **What it checks:**
@@ -272,7 +272,7 @@ Get-M365DomainMigrationStatus -ShowRecommendations
 - Email authentication readiness (SPF/DMARC mandatory April 2025)
 - Deprecated records (msoid CNAME - blocks M365 Apps)
 - Legacy Teams/Skype for Business records
-- Overall migration readiness percentage
+- Overall DNS compliance percentage
 - Migration priority (CRITICAL/High/Medium/Low)
 
 ## Examples
@@ -360,7 +360,7 @@ $records | Select-Object RecordType, Label,
 
 ```powershell
 # Assess all domains for 2025 DNS migrations
-$migrationStatus = Get-M365DomainMigrationStatus -ShowRecommendations
+$migrationStatus = Get-M365DomainReadiness -ShowRecommendations
 
 # Filter domains that need critical attention
 $criticalDomains = $migrationStatus | Where-Object { $_.MigrationPriority -eq "CRITICAL" }
@@ -374,7 +374,7 @@ $noEmailAuth = $migrationStatus | Where-Object { $_.EmailAuthReady -eq $false }
 $noEmailAuth | Select-Object Domain, SPFConfigured, DMARCConfigured, EmailAuthStatus | Format-Table
 
 # Export comprehensive migration report
-Get-M365DomainMigrationStatus -ExportReport -OutputPath "C:\Reports"
+Get-M365DomainReadiness -ExportReport -OutputPath "C:\Reports"
 ```
 
 ### More Examples
@@ -503,7 +503,7 @@ Get-M365DomainDNSRecord -DomainName "contoso.com" -Verbose
 - [x] Add DNS record comparison against actual DNS (`Compare-M365DomainDNS`)
 - [x] Add support for DMARC policy retrieval and validation
 - [x] Enhanced health checks with 2024-2025 Microsoft 365 updates
-- [x] Migration readiness assessment function (`Get-M365DomainMigrationStatus`)
+- [x] DNS compliance assessment function (`Get-M365DomainReadiness`)
 - [x] Detection for new mx.microsoft and dkim.mail.microsoft formats
 - [x] Mandatory email authentication warnings (April 2025)
 - [x] Deprecated record detection (msoid, legacy Skype for Business)
