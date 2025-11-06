@@ -23,6 +23,15 @@ function Test-M365DnsCompliance {
     .PARAMETER Name
         The domain name(s) to validate. If not specified, validates all verified domains.
 
+    .PARAMETER CSVPath
+        Path to CSV file containing expected DNS records for offline validation.
+        Use this to validate DNS without requiring live Microsoft Graph API or Exchange Online access.
+        See Templates/expected-dns-records-template.csv for format.
+
+    .PARAMETER UseExchangeOnline
+        Automatically retrieve DKIM selector CNAMEs using Exchange Online PowerShell (Get-DkimSigningConfig).
+        Requires Exchange Online connection. Run: Connect-ExchangeOnline
+
     .PARAMETER IncludeSPF
         Validate SPF TXT records for email authentication.
 
@@ -31,6 +40,10 @@ function Test-M365DnsCompliance {
 
     .PARAMETER CheckDKIM
         Verify DKIM CNAME records resolve to Microsoft infrastructure.
+        When used with -UseExchangeOnline, automatically retrieves expected DKIM values.
+
+    .PARAMETER CheckMTASTS
+        Validate MTA-STS TXT record (_mta-sts.domain.com) for email encryption policy.
 
     .PARAMETER CheckDeprecated
         Check for deprecated records (msoid, legacy Skype for Business).
@@ -56,11 +69,19 @@ function Test-M365DnsCompliance {
 
     .EXAMPLE
         Test-M365DnsCompliance -Name "contoso.com"
-        Basic DNS compliance check for contoso.com.
+        Basic DNS compliance check for contoso.com using Graph API.
 
     .EXAMPLE
-        Test-M365DnsCompliance -Name "contoso.com" -IncludeSPF -IncludeDMARC -CheckDKIM
-        Comprehensive email security validation.
+        Test-M365DnsCompliance -Name "contoso.com" -IncludeSPF -IncludeDMARC -CheckDKIM -UseExchangeOnline
+        Comprehensive email security validation with automatic DKIM validation via Exchange Online.
+
+    .EXAMPLE
+        Test-M365DnsCompliance -CSVPath ".\Templates\expected-dns-records-template.csv"
+        Offline validation using CSV file (no live API access required).
+
+    .EXAMPLE
+        Test-M365DnsCompliance -Name "contoso.com" -CheckMTASTS -IncludeDMARC
+        Email security validation including MTA-STS and DMARC.
 
     .EXAMPLE
         Test-M365DnsCompliance -CheckDeprecated -ShowRecommendations
@@ -78,8 +99,13 @@ function Test-M365DnsCompliance {
         Custom object array containing comprehensive DNS validation results.
 
     .NOTES
-        Requires Microsoft Graph connection with Domain.Read.All scope.
-        Run: Connect-MgGraph -Scopes "Domain.Read.All"
+        Authentication Requirements:
+        - Microsoft Graph: Connect-MgGraph -Scopes "Domain.Read.All"
+        - Exchange Online (for DKIM): Connect-ExchangeOnline
+
+        CSV-based validation does not require any authentication (offline mode).
+
+        MTA-STS is recommended for enhanced email security but not required by Microsoft 365.
     #>
 
     [CmdletBinding()]
@@ -90,6 +116,21 @@ function Test-M365DnsCompliance {
         [string[]]$Name,
 
         [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            if (-not (Test-Path $_)) {
+                throw "CSV file not found: $_"
+            }
+            if ($_ -notlike "*.csv") {
+                throw "File must be a CSV file"
+            }
+            $true
+        })]
+        [string]$CSVPath,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$UseExchangeOnline,
+
+        [Parameter(Mandatory = $false)]
         [switch]$IncludeSPF,
 
         [Parameter(Mandatory = $false)]
@@ -97,6 +138,9 @@ function Test-M365DnsCompliance {
 
         [Parameter(Mandatory = $false)]
         [switch]$CheckDKIM,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$CheckMTASTS,
 
         [Parameter(Mandatory = $false)]
         [switch]$CheckDeprecated,
@@ -124,10 +168,43 @@ function Test-M365DnsCompliance {
     begin {
         Write-Verbose "Starting DNS compliance validation"
 
-        # Check Microsoft Graph connection
-        $context = Get-MgContext
-        if (-not $context) {
-            throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
+        # Determine validation mode
+        $usingCSV = $PSBoundParameters.ContainsKey('CSVPath')
+        $csvRecords = $null
+
+        if ($usingCSV) {
+            Write-Verbose "Using CSV-based offline validation mode"
+            try {
+                $csvRecords = Import-Csv -Path $CSVPath
+                Write-Verbose "Loaded $($csvRecords.Count) records from CSV"
+            }
+            catch {
+                throw "Failed to import CSV file: $_"
+            }
+        }
+        else {
+            # Check Microsoft Graph connection (required for online validation)
+            Write-Verbose "Using online validation mode (Microsoft Graph API)"
+            $context = Get-MgContext
+            if (-not $context) {
+                throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
+            }
+        }
+
+        # Check Exchange Online connection if DKIM validation with Exchange requested
+        if ($UseExchangeOnline -and $CheckDKIM) {
+            Write-Verbose "Checking Exchange Online connection for DKIM validation"
+            try {
+                $exoSession = Get-PSSession | Where-Object { $_.ConfigurationName -eq 'Microsoft.Exchange' -and $_.State -eq 'Opened' }
+                if (-not $exoSession) {
+                    Write-Warning "Exchange Online not connected. DKIM validation will use Graph API records only. Run: Connect-ExchangeOnline"
+                    $UseExchangeOnline = $false
+                }
+            }
+            catch {
+                Write-Warning "Could not verify Exchange Online connection: $_"
+                $UseExchangeOnline = $false
+            }
         }
 
         $complianceResults = @()
@@ -135,29 +212,42 @@ function Test-M365DnsCompliance {
 
     process {
         try {
-            # If no domain specified, get all verified domains
-            if (-not $Name) {
-                Write-Verbose "No domain specified, retrieving all verified domains"
-                $domains = Get-MgDomain -All | Where-Object { $_.IsVerified -eq $true }
-                $Name = $domains.Id
+            # Determine which domains to validate
+            if ($usingCSV) {
+                # Get unique domains from CSV
+                if (-not $Name) {
+                    $Name = $csvRecords | Select-Object -ExpandProperty Domain -Unique
+                    Write-Verbose "Found $($Name.Count) unique domain(s) in CSV"
+                }
+            }
+            else {
+                # Get domains from Graph API
+                if (-not $Name) {
+                    Write-Verbose "No domain specified, retrieving all verified domains"
+                    $domains = Get-MgDomain -All | Where-Object { $_.IsVerified -eq $true }
+                    $Name = $domains.Id
+                }
             }
 
             foreach ($domain in $Name) {
                 Write-Host "`nValidating DNS compliance for: $domain" -ForegroundColor Cyan
 
                 # Get domain information
-                try {
-                    $domainInfo = Get-MgDomain -DomainId $domain -ErrorAction Stop
-                }
-                catch {
-                    Write-Warning "Failed to retrieve domain $domain : $_"
-                    continue
+                $domainInfo = $null
+                if (-not $usingCSV) {
+                    try {
+                        $domainInfo = Get-MgDomain -DomainId $domain -ErrorAction Stop
+                    }
+                    catch {
+                        Write-Warning "Failed to retrieve domain $domain : $_"
+                        continue
+                    }
                 }
 
                 # Initialize compliance result
                 $compliance = [PSCustomObject]@{
                     Domain              = $domain
-                    IsVerified          = $domainInfo.IsVerified
+                    IsVerified          = if ($domainInfo) { $domainInfo.IsVerified } else { "Unknown (CSV mode)" }
                     OverallHealth       = "Unknown"
                     ComplianceScore     = 0
                     MXStatus            = "Unknown"
@@ -168,21 +258,36 @@ function Test-M365DnsCompliance {
                     UsingLegacyDKIM     = $false
                     SPFStatus           = if ($IncludeSPF) { "Unknown" } else { "Not Checked" }
                     DMARCStatus         = if ($IncludeDMARC) { "Unknown" } else { "Not Checked" }
+                    MTASTSStatus        = if ($CheckMTASTS) { "Unknown" } else { "Not Checked" }
                     DeprecatedRecords   = if ($CheckDeprecated) { @() } else { "Not Checked" }
                     SRVStatus           = if ($CheckSRV) { "Unknown" } else { "Not Checked" }
                     Issues              = @()
                     Recommendations     = @()
                 }
 
-                # Get expected DNS records from Graph API
-                Write-Verbose "Retrieving expected DNS configuration from Microsoft Graph"
-                $expectedRecords = Get-MgDomainServiceConfigurationRecord -DomainId $domain -ErrorAction SilentlyContinue
+                # Get expected DNS records (from CSV or Graph API)
+                $expectedRecords = $null
+                if ($usingCSV) {
+                    Write-Verbose "Loading expected DNS records from CSV for $domain"
+                    $expectedRecords = $csvRecords | Where-Object { $_.Domain -eq $domain }
 
-                if (-not $expectedRecords) {
-                    $compliance.OverallHealth = "Warning"
-                    $compliance.Issues += "No service configuration records found in Microsoft Graph"
-                    $complianceResults += $compliance
-                    continue
+                    if (-not $expectedRecords) {
+                        $compliance.OverallHealth = "Warning"
+                        $compliance.Issues += "No records found for $domain in CSV file"
+                        $complianceResults += $compliance
+                        continue
+                    }
+                }
+                else {
+                    Write-Verbose "Retrieving expected DNS configuration from Microsoft Graph"
+                    $expectedRecords = Get-MgDomainServiceConfigurationRecord -DomainId $domain -ErrorAction SilentlyContinue
+
+                    if (-not $expectedRecords) {
+                        $compliance.OverallHealth = "Warning"
+                        $compliance.Issues += "No service configuration records found in Microsoft Graph"
+                        $complianceResults += $compliance
+                        continue
+                    }
                 }
 
                 # Initialize scoring
@@ -190,10 +295,21 @@ function Test-M365DnsCompliance {
                 $passedChecks = 0
 
                 # === MX RECORD VALIDATION ===
-                $mxRecords = $expectedRecords | Where-Object { $_.AdditionalProperties['recordType'] -eq 'Mx' }
+                if ($usingCSV) {
+                    $mxRecords = $expectedRecords | Where-Object { $_.RecordType -eq 'MX' }
+                }
+                else {
+                    $mxRecords = $expectedRecords | Where-Object { $_.AdditionalProperties['recordType'] -eq 'Mx' }
+                }
+
                 if ($mxRecords) {
                     $totalChecks++
-                    $expectedMX = $mxRecords[0].AdditionalProperties['mailExchange']
+                    if ($usingCSV) {
+                        $expectedMX = $mxRecords[0].ExpectedValue
+                    }
+                    else {
+                        $expectedMX = $mxRecords[0].AdditionalProperties['mailExchange']
+                    }
 
                     Write-Verbose "Querying DNS for MX record: $domain"
                     $dnsParams = @{
@@ -238,14 +354,62 @@ function Test-M365DnsCompliance {
                 }
 
                 # === DKIM VALIDATION ===
-                $dkimRecords = $expectedRecords | Where-Object { $_.AdditionalProperties['recordType'] -eq 'CName' -and $_.AdditionalProperties['label'] -like '*._domainkey.*' }
+                $dkimRecords = @()
+
+                # Get DKIM records from Exchange Online PowerShell if requested
+                if ($UseExchangeOnline -and $CheckDKIM) {
+                    Write-Verbose "Retrieving DKIM configuration from Exchange Online PowerShell"
+                    try {
+                        $dkimConfig = Get-DkimSigningConfig -Identity $domain -ErrorAction Stop
+
+                        if ($dkimConfig) {
+                            # Create pseudo-records from Exchange Online data
+                            if ($dkimConfig.Selector1CNAME) {
+                                $dkimRecords += [PSCustomObject]@{
+                                    Label = "selector1._domainkey"
+                                    ExpectedValue = $dkimConfig.Selector1CNAME
+                                    Source = "ExchangeOnline"
+                                }
+                            }
+                            if ($dkimConfig.Selector2CNAME) {
+                                $dkimRecords += [PSCustomObject]@{
+                                    Label = "selector2._domainkey"
+                                    ExpectedValue = $dkimConfig.Selector2CNAME
+                                    Source = "ExchangeOnline"
+                                }
+                            }
+                        }
+                    }
+                    catch {
+                        Write-Warning "Failed to get DKIM config from Exchange Online: $_"
+                    }
+                }
+                # Otherwise get from CSV or Graph API
+                elseif ($usingCSV) {
+                    $dkimRecords = $expectedRecords | Where-Object { $_.RecordType -eq 'CNAME' -and $_.Label -like '*._domainkey*' }
+                }
+                else {
+                    $dkimRecords = $expectedRecords | Where-Object { $_.AdditionalProperties['recordType'] -eq 'CName' -and $_.AdditionalProperties['label'] -like '*._domainkey.*' }
+                }
+
                 if ($dkimRecords) {
                     $totalChecks++
                     $dkimValid = $true
 
                     foreach ($dkimRecord in $dkimRecords) {
-                        $dkimLabel = $dkimRecord.AdditionalProperties['label']
-                        $expectedCName = $dkimRecord.AdditionalProperties['canonicalName']
+                        # Extract label and expected CNAME based on source
+                        if ($dkimRecord.Source -eq "ExchangeOnline") {
+                            $dkimLabel = $dkimRecord.Label
+                            $expectedCName = $dkimRecord.ExpectedValue
+                        }
+                        elseif ($usingCSV) {
+                            $dkimLabel = $dkimRecord.Label
+                            $expectedCName = $dkimRecord.ExpectedValue
+                        }
+                        else {
+                            $dkimLabel = $dkimRecord.AdditionalProperties['label']
+                            $expectedCName = $dkimRecord.AdditionalProperties['canonicalName']
+                        }
 
                         Write-Verbose "Querying DNS for DKIM CNAME: $dkimLabel.$domain"
                         $dnsParams = @{
@@ -359,7 +523,32 @@ function Test-M365DnsCompliance {
                     else {
                         $compliance.DMARCStatus = "Missing"
                         $compliance.Issues += "DMARC record not found (required by April 2025 mandate)"
-                        $compliance.Recommendations += "Add DMARC record at _dmarc.$domain"
+                        $compliance.Recommendations += "Add DMARC record at _dmarc.$domain (use New-M365DmarcRecord)"
+                    }
+                }
+
+                # === MTA-STS VALIDATION ===
+                if ($CheckMTASTS) {
+                    $totalChecks++
+                    Write-Verbose "Checking MTA-STS record for $domain"
+
+                    $dnsParams = @{
+                        Name = "_mta-sts.$domain"
+                        Type = 'TXT'
+                        Method = $Method
+                    }
+                    if ($Server) { $dnsParams['Server'] = $Server }
+
+                    $mtastsRecord = Invoke-DnsQuery @dnsParams
+
+                    if ($mtastsRecord -and $mtastsRecord.Strings -like "v=STSv1*") {
+                        $compliance.MTASTSStatus = "Valid"
+                        $passedChecks++
+                    }
+                    else {
+                        $compliance.MTASTSStatus = "Missing"
+                        $compliance.Issues += "MTA-STS record not found (recommended for enhanced email security)"
+                        $compliance.Recommendations += "Consider adding MTA-STS record at _mta-sts.$domain for email encryption enforcement"
                     }
                 }
 
@@ -460,6 +649,10 @@ function Test-M365DnsCompliance {
 
                 if ($IncludeDMARC) {
                     Write-Host "  DMARC Status: $($compliance.DMARCStatus)" -ForegroundColor White
+                }
+
+                if ($CheckMTASTS) {
+                    Write-Host "  MTA-STS Status: $($compliance.MTASTSStatus)" -ForegroundColor White
                 }
 
                 # Show issues

@@ -7,27 +7,32 @@ A comprehensive PowerShell module for querying and managing Microsoft 365 domain
 
 ## Overview
 
-DNS4M365 simplifies the process of retrieving and managing DNS records for Microsoft 365 domains. It provides an easy-to-use PowerShell interface for:
+DNS4M365 simplifies the process of retrieving, validating, and managing DNS records for Microsoft 365 domains. It provides an easy-to-use PowerShell interface for:
 
-- 🔍 Enumerating all domains in a Microsoft 365 tenant
-- ✅ Splitting domains by verification status (Verified/Unverified)
+- 🔍 Validating DNS compliance against Microsoft Graph API and Exchange Online
+- ✅ Monitoring DNS propagation in real-time across multiple resolvers
 - 📋 Retrieving Microsoft-generated DNS records (MX, CNAME, TXT, SRV)
-- 🔐 Getting domain verification records
-- 📊 Exporting comprehensive reports (CSV, JSON, HTML)
-- 🏥 Testing domain health and configuration
+- 🔐 Automatic DKIM validation via Exchange Online PowerShell
+- 📊 CSV-based offline validation (no live API access required)
+- 🛡️ DMARC policy generation (New-M365DmarcRecord cmdlet)
+- 🔒 MTA-STS validation for email encryption
+- 📈 Baseline/diff mode for change detection over time
+- 🏥 Comprehensive health checks and compliance scoring
 
 ## Features
 
-### Core Capabilities
+### Core Capabilities (v1.3.0)
 
-- **Domain Enumeration**: List all domains with verification status, supported services, and authentication type
-- **DNS Record Retrieval**: Get all Microsoft-generated DNS records for verified domains
-- **Verification Management**: Retrieve verification records for unverified domains
-- **Flexible Filtering**: Filter by domain, record type (MX, CNAME, TXT, SRV), or service type (Email, Teams, SharePoint)
-- **Health Checks**: Test domain verification status and configuration
+- **DNS Compliance Validation**: Test-M365DnsCompliance validates actual DNS against expected values
+- **Automatic DKIM Validation**: Retrieves DKIM selectors from Exchange Online PowerShell
+- **CSV-Based Offline Validation**: Validate DNS without live API access (ideal for testing)
+- **DMARC Policy Generation**: New-M365DmarcRecord cmdlet creates compliant DMARC records
+- **MTA-STS Support**: Validates MTA-STS TXT records for email encryption enforcement
+- **Real-Time DNS Monitoring**: Watch-M365DnsPropagation tracks propagation across resolvers
+- **Baseline/Diff Mode**: Save DNS snapshots and detect changes over time
+- **DNS-over-HTTPS**: Optional encrypted DNS queries via Google Public DNS
 - **Report Generation**: Export data to CSV, JSON, or HTML formats
 - **Pipeline Support**: Full PowerShell pipeline compatibility
-- **DNS-over-HTTPS**: Consistent DNS lookups using Google Public DNS (independent of local resolver configuration)
 
 ### Record Types Supported
 
@@ -49,8 +54,10 @@ DNS4M365 simplifies the process of retrieving and managing DNS records for Micro
 
 - PowerShell 5.1 or higher
 - Microsoft Graph PowerShell SDK modules:
-  - `Microsoft.Graph.Authentication`
-  - `Microsoft.Graph.Identity.DirectoryManagement`
+  - `Microsoft.Graph.Authentication` (v2.0.0+)
+  - `Microsoft.Graph.Identity.DirectoryManagement` (v2.0.0+)
+- Exchange Online PowerShell module (for automatic DKIM validation):
+  - `ExchangeOnlineManagement` (v3.0.0+)
 
 ### Installation
 
@@ -58,8 +65,11 @@ DNS4M365 simplifies the process of retrieving and managing DNS records for Micro
 
 ```powershell
 # Install Microsoft Graph PowerShell modules
-Install-Module Microsoft.Graph.Authentication -Scope CurrentUser -Force
-Install-Module Microsoft.Graph.Identity.DirectoryManagement -Scope CurrentUser -Force
+Install-Module Microsoft.Graph.Authentication -MinimumVersion 2.0.0 -Scope CurrentUser -Force
+Install-Module Microsoft.Graph.Identity.DirectoryManagement -MinimumVersion 2.0.0 -Scope CurrentUser -Force
+
+# Install Exchange Online Management module (optional - for automatic DKIM validation)
+Install-Module ExchangeOnlineManagement -MinimumVersion 3.0.0 -Scope CurrentUser -Force
 ```
 
 #### Install DNS4M365 Module
@@ -85,20 +95,159 @@ Install-Module Microsoft.Graph.Identity.DirectoryManagement -Scope CurrentUser -
    Import-Module DNS4M365
    ```
 
+### Permissions and Authentication
+
+#### Required Permissions
+
+DNS4M365 requires different permissions depending on the features you use:
+
+##### Microsoft Graph API Permissions
+
+| Permission | Scope | Required For | Type |
+|------------|-------|--------------|------|
+| Domain.Read.All | Delegated or Application | Reading domain and DNS configuration | Read-only |
+| Domain.ReadWrite.All | Delegated or Application | Writing domain configuration (future) | Read/Write |
+
+##### Azure AD Roles (for Delegated Auth)
+
+Minimum role required: **Global Reader** or **Domain Name Administrator**
+
+- **Global Reader**: Read-only access to all Azure AD and Microsoft 365 settings
+- **Domain Name Administrator**: Can manage domain names and DNS configuration
+- **Global Administrator**: Full access (not recommended for read-only operations)
+
+##### Exchange Online Permissions (for DKIM Validation)
+
+For automatic DKIM validation via `Test-M365DnsCompliance -UseExchangeOnline`:
+
+| Permission | Role | Required For |
+|------------|------|--------------|
+| View-Only Configuration | Organization Management (View-Only) | Reading DKIM configuration |
+| Get-DkimSigningConfig | Exchange Administrator | Reading DKIM signing configuration |
+| Mail Flow Administrator | Mail Flow Administrator | Managing DKIM settings |
+
+#### Authentication Methods
+
+##### Method 1: Interactive Authentication (Recommended for User Accounts)
+
+```powershell
+# Connect to Microsoft Graph
+Connect-MgGraph -Scopes "Domain.Read.All"
+
+# Connect to Exchange Online (optional - for DKIM validation)
+Connect-ExchangeOnline
+
+# Verify connections
+Get-MgContext
+Get-ConnectionInformation
+
+# Use the module
+Test-M365DnsCompliance -Name "contoso.com" -IncludeSPF -IncludeDMARC -CheckDKIM -UseExchangeOnline
+```
+
+##### Method 2: Certificate-Based Authentication (Service Principals / CI/CD)
+
+**Microsoft Graph:**
+```powershell
+# Connect using certificate thumbprint
+Connect-MgGraph -ClientId "YOUR_APP_ID" `
+                -TenantId "YOUR_TENANT_ID" `
+                -CertificateThumbprint "YOUR_CERT_THUMBPRINT"
+
+# OR using certificate from file
+$cert = Get-PfxCertificate -FilePath "C:\Certs\app-cert.pfx"
+Connect-MgGraph -ClientId "YOUR_APP_ID" `
+                -TenantId "YOUR_TENANT_ID" `
+                -Certificate $cert
+```
+
+**Exchange Online:**
+```powershell
+# Connect using certificate
+Connect-ExchangeOnline -CertificateThumbprint "YOUR_CERT_THUMBPRINT" `
+                        -AppId "YOUR_APP_ID" `
+                        -Organization "contoso.onmicrosoft.com"
+```
+
+##### Method 3: CSV-Based Offline Validation (No Authentication Required)
+
+For scenarios where you don't have or don't want to use live API access:
+
+```powershell
+# 1. Create CSV file with expected DNS records (see Templates/expected-dns-records-template.csv)
+
+# 2. Run validation offline
+Test-M365DnsCompliance -CSVPath ".\expected-dns-records.csv"
+
+# 3. Compare against CSV
+Compare-M365DnsRecord -CSVPath ".\expected-dns-records.csv"
+```
+
+**Benefits of CSV Mode:**
+- No authentication required
+- Ideal for testing and validation scripts
+- Works in restricted environments
+- Reproducible validation (version-controlled expected values)
+
+#### Setting Up Service Principal Authentication
+
+For automated/CI-CD scenarios, create a service principal with certificate authentication:
+
+**Step 1: Register Azure AD Application**
+```powershell
+# In Azure Portal or Azure CLI
+az ad app create --display-name "DNS4M365-Automation"
+
+# Note the Application (client) ID and Tenant ID
+```
+
+**Step 2: Create and Upload Certificate**
+```powershell
+# Create self-signed certificate
+$cert = New-SelfSignedCertificate -Subject "CN=DNS4M365-Automation" `
+                                   -CertStoreLocation "Cert:\CurrentUser\My" `
+                                   -KeyExportPolicy Exportable `
+                                   -KeySpec Signature `
+                                   -NotAfter (Get-Date).AddYears(2)
+
+# Export certificate
+Export-Certificate -Cert $cert -FilePath ".\DNS4M365-Automation.cer"
+
+# Upload to Azure AD app registration (Certificates & secrets)
+```
+
+**Step 3: Assign API Permissions**
+```
+1. Go to Azure Portal > App registrations > Your App
+2. API permissions > Add a permission
+3. Microsoft Graph > Application permissions > Domain.Read.All
+4. Grant admin consent
+```
+
+**Step 4: Assign Exchange Online Permissions**
+```powershell
+# Connect to Exchange Online as admin
+Connect-ExchangeOnline
+
+# Add service principal to role group
+New-ManagementRoleAssignment -Role "View-Only Configuration" `
+                              -App "YOUR_APP_ID"
+```
+
 ### Basic Usage
 
 ```powershell
-# 1. Connect to Microsoft 365
-Connect-M365DNS
+# 1. Connect to Microsoft Graph
+Connect-MgGraph -Scopes "Domain.Read.All"
 
-# 2. List all domains
-Get-M365Domain
+# 2. Validate DNS compliance
+Test-M365DnsCompliance -Name "contoso.com" -IncludeSPF -IncludeDMARC -CheckMTASTS
 
-# 3. Get DNS records for all verified domains
-Get-M365DomainDNSRecord
+# 3. Generate DMARC record
+New-M365DmarcRecord -Domain "contoso.com" -Policy quarantine -AggregateReportEmail "dmarc@contoso.com"
 
-# 4. Export a comprehensive report
-Export-M365DomainReport -Format HTML
+# 4. Watch DNS propagation
+Watch-M365DnsPropagation -Name "contoso.com" -RecordType MX -ExpectedValue "contoso-com.mail.protection.outlook.com"
 ```
 
 ## Documentation
@@ -114,18 +263,42 @@ This guide covers:
 - Using the Microsoft 365 Admin Center (GUI)
 - Using PowerShell (both native cmdlets and this module)
 
-### What's New in v1.1.0 (2025-01-06)
+### What's New in v1.3.0 (2025-01-06)
 
-**Enhanced for 2024-2025 Microsoft 365 DNS Changes:**
+**Exchange Online Integration & Enhanced Features:**
 
-- **NEW:** `Get-M365DomainReadiness` - Assess DNS compliance for 2025 DNS updates
-- **Enhanced MX Detection:** Identifies new `mx.microsoft` format (July-August 2025 migration)
-- **Enhanced DKIM Detection:** Identifies new `dkim.mail.microsoft` format (May 2025+)
-- **Mandatory Email Auth Warnings:** Critical alerts for SPF/DMARC requirements (April 2025)
-- **Deprecated Records:** Enhanced detection for msoid and legacy Skype for Business CNAMEs
-- **Regional Cloud Support:** Improved detection for GCC High, DoD, and 21Vianet
-- **Teams-Only Detection:** Identifies legacy Skype for Business records not needed for Teams
-- **DNS-over-HTTPS:** All DNS lookups use Google Public DNS for consistent, reliable results
+- **NEW:** `New-M365DmarcRecord` - Generate compliant DMARC policies (mandatory April 2025)
+- **Exchange Online Integration:** Automatic DKIM validation via Get-DkimSigningConfig
+- **CSV-Based Offline Validation:** Validate DNS without live API access (ideal for testing/restricted environments)
+- **MTA-STS Support:** Validate MTA-STS TXT records for email encryption enforcement
+- **Enhanced Test-M365DnsCompliance:** Added `-UseExchangeOnline`, `-CSVPath`, `-CheckMTASTS` parameters
+- **Enhanced Compare-M365DnsRecord:** Added `-CSVPath` parameter for offline comparison
+- **CSV Template:** Pre-built template (Templates/expected-dns-records-template.csv) for offline validation
+- **Comprehensive Permissions Documentation:** Detailed guide for Graph API, Exchange Online, and service principal authentication
+
+**Dependencies:**
+- Added ExchangeOnlineManagement module (v3.0.0+) for DKIM validation
+- Requires Exchange Online admin permissions for automatic DKIM retrieval
+
+**CSV Workflow:**
+```powershell
+# 1. Get template
+Get-Content Templates/expected-dns-records-template.csv
+
+# 2. Fill in your tenant-specific values
+
+# 3. Validate offline (no authentication required)
+Test-M365DnsCompliance -CSVPath ".\my-expected-dns.csv"
+```
+
+### What's New in v1.2.0 (2025-01-06)
+
+**KISS Architecture Simplification:**
+- Consolidated 3 validation functions into `Test-M365DnsCompliance`
+- Removed wrapper functions (use native Microsoft.Graph cmdlets directly)
+- Added `Watch-M365DnsPropagation` for real-time DNS monitoring
+- Baseline/diff mode for change detection
+- Enhanced legacy format detection (MX, DKIM)
 
 ### Available Commands
 
