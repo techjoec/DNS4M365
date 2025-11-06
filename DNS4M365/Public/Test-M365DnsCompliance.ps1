@@ -27,6 +27,13 @@ function Test-M365DnsCompliance {
         Path to CSV file containing expected DNS records for offline validation.
         Use this to validate DNS without requiring live Microsoft Graph API or Exchange Online access.
         See Templates/expected-dns-records-template.csv for format.
+        Mutually exclusive with -JSONPath.
+
+    .PARAMETER JSONPath
+        Path to JSON file containing expected DNS records for offline validation.
+        Use this to validate DNS without requiring live Microsoft Graph API or Exchange Online access.
+        See Templates/expected-dns-records-template.json for format.
+        Mutually exclusive with -CSVPath.
 
     .PARAMETER UseExchangeOnline
         Automatically retrieve DKIM selector CNAMEs using Exchange Online PowerShell (Get-DkimSigningConfig).
@@ -80,6 +87,10 @@ function Test-M365DnsCompliance {
         Offline validation using CSV file (no live API access required).
 
     .EXAMPLE
+        Test-M365DnsCompliance -JSONPath ".\Templates\expected-dns-records-template.json"
+        Offline validation using JSON file (no live API access required).
+
+    .EXAMPLE
         Test-M365DnsCompliance -Name "contoso.com" -CheckMTASTS -IncludeDMARC
         Email security validation including MTA-STS and DMARC.
 
@@ -103,7 +114,7 @@ function Test-M365DnsCompliance {
         - Microsoft Graph: Connect-MgGraph -Scopes "Domain.Read.All"
         - Exchange Online (for DKIM): Connect-ExchangeOnline
 
-        CSV-based validation does not require any authentication (offline mode).
+        CSV/JSON-based validation does not require any authentication (offline mode).
 
         MTA-STS is recommended for enhanced email security but not required by Microsoft 365.
     #>
@@ -126,6 +137,18 @@ function Test-M365DnsCompliance {
             $true
         })]
         [string]$CSVPath,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            if (-not (Test-Path $_)) {
+                throw "JSON file not found: $_"
+            }
+            if ($_ -notlike "*.json") {
+                throw "File must be a JSON file"
+            }
+            $true
+        })]
+        [string]$JSONPath,
 
         [Parameter(Mandatory = $false)]
         [switch]$UseExchangeOnline,
@@ -168,42 +191,103 @@ function Test-M365DnsCompliance {
     begin {
         Write-Verbose "Starting DNS compliance validation"
 
-        # Determine validation mode
+        # Check for mutual exclusivity
         $usingCSV = $PSBoundParameters.ContainsKey('CSVPath')
-        $csvRecords = $null
+        $usingJSON = $PSBoundParameters.ContainsKey('JSONPath')
+
+        if ($usingCSV -and $usingJSON) {
+            throw "Cannot specify both -CSVPath and -JSONPath. Please use only one offline validation method."
+        }
+
+        # Determine validation mode
+        $offlineRecords = $null
+        $usingOffline = $usingCSV -or $usingJSON
 
         if ($usingCSV) {
             Write-Verbose "Using CSV-based offline validation mode"
             try {
-                $csvRecords = Import-Csv -Path $CSVPath
-                Write-Verbose "Loaded $($csvRecords.Count) records from CSV"
+                $offlineRecords = Import-Csv -Path $CSVPath
+                Write-Verbose "Loaded $($offlineRecords.Count) records from CSV"
             }
             catch {
                 throw "Failed to import CSV file: $_"
             }
         }
+        elseif ($usingJSON) {
+            Write-Verbose "Using JSON-based offline validation mode"
+            try {
+                $jsonContent = Get-Content -Path $JSONPath -Raw | ConvertFrom-Json
+                # Convert to array if single object
+                $offlineRecords = if ($jsonContent -is [array]) { $jsonContent } else { @($jsonContent) }
+                Write-Verbose "Loaded $($offlineRecords.Count) records from JSON"
+            }
+            catch {
+                throw "Failed to import JSON file: $_"
+            }
+        }
         else {
-            # Check Microsoft Graph connection (required for online validation)
+            # Check Microsoft Graph module availability (required for online validation)
             Write-Verbose "Using online validation mode (Microsoft Graph API)"
-            $context = Get-MgContext
-            if (-not $context) {
-                throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
+
+            # Check if Microsoft.Graph.Authentication module is available
+            $graphAuthModule = Get-Module -ListAvailable -Name Microsoft.Graph.Authentication | Select-Object -First 1
+            if (-not $graphAuthModule) {
+                throw @"
+Microsoft Graph module not installed.
+
+OPTION 1: Install Microsoft Graph modules (for Graph API validation):
+    Install-Module Microsoft.Graph.Authentication -MinimumVersion 2.0.0 -Scope CurrentUser
+    Install-Module Microsoft.Graph.Identity.DirectoryManagement -MinimumVersion 2.0.0 -Scope CurrentUser
+    Connect-MgGraph -Scopes 'Domain.Read.All'
+
+OPTION 2: Use CSV/JSON-based offline validation (no dependencies required):
+    Test-M365DnsCompliance -CSVPath ".\expected-dns-records.csv"
+    Test-M365DnsCompliance -JSONPath ".\expected-dns-records.json"
+    (See Templates/ for template files)
+"@
+            }
+
+            # Check Graph connection
+            try {
+                $context = Get-MgContext
+                if (-not $context) {
+                    throw "Not connected to Microsoft Graph. Please run: Connect-MgGraph -Scopes 'Domain.Read.All'"
+                }
+            }
+            catch {
+                throw "Microsoft Graph connection error: $_`n`nPlease connect: Connect-MgGraph -Scopes 'Domain.Read.All'"
             }
         }
 
         # Check Exchange Online connection if DKIM validation with Exchange requested
         if ($UseExchangeOnline -and $CheckDKIM) {
             Write-Verbose "Checking Exchange Online connection for DKIM validation"
-            try {
-                $exoSession = Get-PSSession | Where-Object { $_.ConfigurationName -eq 'Microsoft.Exchange' -and $_.State -eq 'Opened' }
-                if (-not $exoSession) {
-                    Write-Warning "Exchange Online not connected. DKIM validation will use Graph API records only. Run: Connect-ExchangeOnline"
+
+            # Check if ExchangeOnlineManagement module is available
+            $exoModule = Get-Module -ListAvailable -Name ExchangeOnlineManagement | Select-Object -First 1
+            if (-not $exoModule) {
+                Write-Warning @"
+ExchangeOnlineManagement module not installed. DKIM validation will use Graph API records only.
+
+To enable automatic DKIM validation via Exchange Online PowerShell:
+    Install-Module ExchangeOnlineManagement -MinimumVersion 3.0.0 -Scope CurrentUser
+    Connect-ExchangeOnline
+"@
+                $UseExchangeOnline = $false
+            }
+            else {
+                # Check connection
+                try {
+                    $exoSession = Get-PSSession | Where-Object { $_.ConfigurationName -eq 'Microsoft.Exchange' -and $_.State -eq 'Opened' }
+                    if (-not $exoSession) {
+                        Write-Warning "Exchange Online not connected. DKIM validation will use Graph API records only. Run: Connect-ExchangeOnline"
+                        $UseExchangeOnline = $false
+                    }
+                }
+                catch {
+                    Write-Warning "Could not verify Exchange Online connection: $_"
                     $UseExchangeOnline = $false
                 }
-            }
-            catch {
-                Write-Warning "Could not verify Exchange Online connection: $_"
-                $UseExchangeOnline = $false
             }
         }
 
@@ -213,11 +297,12 @@ function Test-M365DnsCompliance {
     process {
         try {
             # Determine which domains to validate
-            if ($usingCSV) {
-                # Get unique domains from CSV
+            if ($usingOffline) {
+                # Get unique domains from CSV/JSON
                 if (-not $Name) {
-                    $Name = $csvRecords | Select-Object -ExpandProperty Domain -Unique
-                    Write-Verbose "Found $($Name.Count) unique domain(s) in CSV"
+                    $Name = $offlineRecords | Select-Object -ExpandProperty Domain -Unique
+                    $sourceType = if ($usingCSV) { "CSV" } else { "JSON" }
+                    Write-Verbose "Found $($Name.Count) unique domain(s) in $sourceType"
                 }
             }
             else {
@@ -234,7 +319,7 @@ function Test-M365DnsCompliance {
 
                 # Get domain information
                 $domainInfo = $null
-                if (-not $usingCSV) {
+                if (-not $usingOffline) {
                     try {
                         $domainInfo = Get-MgDomain -DomainId $domain -ErrorAction Stop
                     }
@@ -245,9 +330,14 @@ function Test-M365DnsCompliance {
                 }
 
                 # Initialize compliance result
+                $offlineMode = if ($usingOffline) {
+                    if ($usingCSV) { "CSV mode" } else { "JSON mode" }
+                } else {
+                    $null
+                }
                 $compliance = [PSCustomObject]@{
                     Domain              = $domain
-                    IsVerified          = if ($domainInfo) { $domainInfo.IsVerified } else { "Unknown (CSV mode)" }
+                    IsVerified          = if ($domainInfo) { $domainInfo.IsVerified } elseif ($offlineMode) { "Unknown ($offlineMode)" } else { "Unknown" }
                     OverallHealth       = "Unknown"
                     ComplianceScore     = 0
                     MXStatus            = "Unknown"
@@ -265,15 +355,16 @@ function Test-M365DnsCompliance {
                     Recommendations     = @()
                 }
 
-                # Get expected DNS records (from CSV or Graph API)
+                # Get expected DNS records (from CSV/JSON or Graph API)
                 $expectedRecords = $null
-                if ($usingCSV) {
-                    Write-Verbose "Loading expected DNS records from CSV for $domain"
-                    $expectedRecords = $csvRecords | Where-Object { $_.Domain -eq $domain }
+                if ($usingOffline) {
+                    $sourceType = if ($usingCSV) { "CSV" } else { "JSON" }
+                    Write-Verbose "Loading expected DNS records from $sourceType for $domain"
+                    $expectedRecords = $offlineRecords | Where-Object { $_.Domain -eq $domain }
 
                     if (-not $expectedRecords) {
                         $compliance.OverallHealth = "Warning"
-                        $compliance.Issues += "No records found for $domain in CSV file"
+                        $compliance.Issues += "No records found for $domain in $sourceType file"
                         $complianceResults += $compliance
                         continue
                     }
@@ -295,7 +386,7 @@ function Test-M365DnsCompliance {
                 $passedChecks = 0
 
                 # === MX RECORD VALIDATION ===
-                if ($usingCSV) {
+                if ($usingOffline) {
                     $mxRecords = $expectedRecords | Where-Object { $_.RecordType -eq 'MX' }
                 }
                 else {
@@ -304,7 +395,7 @@ function Test-M365DnsCompliance {
 
                 if ($mxRecords) {
                     $totalChecks++
-                    if ($usingCSV) {
+                    if ($usingOffline) {
                         $expectedMX = $mxRecords[0].ExpectedValue
                     }
                     else {
@@ -384,8 +475,8 @@ function Test-M365DnsCompliance {
                         Write-Warning "Failed to get DKIM config from Exchange Online: $_"
                     }
                 }
-                # Otherwise get from CSV or Graph API
-                elseif ($usingCSV) {
+                # Otherwise get from CSV/JSON or Graph API
+                elseif ($usingOffline) {
                     $dkimRecords = $expectedRecords | Where-Object { $_.RecordType -eq 'CNAME' -and $_.Label -like '*._domainkey*' }
                 }
                 else {
@@ -402,7 +493,7 @@ function Test-M365DnsCompliance {
                             $dkimLabel = $dkimRecord.Label
                             $expectedCName = $dkimRecord.ExpectedValue
                         }
-                        elseif ($usingCSV) {
+                        elseif ($usingOffline) {
                             $dkimLabel = $dkimRecord.Label
                             $expectedCName = $dkimRecord.ExpectedValue
                         }
