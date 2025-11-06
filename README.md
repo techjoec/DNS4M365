@@ -50,6 +50,44 @@ DNS4M365 simplifies the process of retrieving, validating, and managing DNS reco
 
 ## Quick Start
 
+### Installation
+
+**Step 1: Clone or Download**
+```powershell
+git clone https://github.com/yourusername/DNS4M365.git
+cd DNS4M365
+```
+
+**Step 2: Install Dependencies (Optional)**
+
+Choose based on your use case:
+
+- **For CSV/JSON offline validation**: No dependencies needed! Skip to Step 3.
+- **For Graph API features**: Install Microsoft Graph modules
+  ```powershell
+  Install-Module Microsoft.Graph.Authentication -Scope CurrentUser -Force
+  Install-Module Microsoft.Graph.Identity.DirectoryManagement -Scope CurrentUser -Force
+  ```
+- **For automatic DKIM validation**: Also install Exchange Online module
+  ```powershell
+  Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
+  ```
+
+**Step 3: Import Module**
+```powershell
+Import-Module .\DNS4M365\DNS4M365.psd1
+```
+
+**Step 4: Start Using**
+```powershell
+# Option A: CSV/JSON offline validation (no authentication)
+Test-M365DnsCompliance -CSVPath ".\Templates\expected-dns-records-template.csv"
+
+# Option B: Interactive with Graph API (authentication required)
+Connect-MgGraph -Scopes "Domain.Read.All"
+Test-M365DnsCompliance -Name "contoso.com"
+```
+
 ### Prerequisites
 
 #### Required
