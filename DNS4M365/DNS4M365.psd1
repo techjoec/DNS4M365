@@ -36,7 +36,9 @@
         'Get-M365DomainDNSRecord',
         'Get-M365DomainVerificationRecord',
         'Export-M365DomainReport',
-        'Test-M365DomainVerification'
+        'Test-M365DomainVerification',
+        'Get-M365DomainDNSHealth',
+        'Compare-M365DomainDNS'
     )
 
     # Cmdlets to export from this module
