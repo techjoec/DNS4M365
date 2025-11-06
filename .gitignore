@@ -1,0 +1,57 @@
+# PowerShell
+*.ps1xml
+*.psc1
+*.log
+
+# Build artifacts
+build/
+dist/
+*.zip
+
+# Test results
+TestResults/
+*.trx
+
+# Reports and exports
+*.csv
+*.json
+*.html
+*-zone.txt
+Reports/
+Domain-Audit-*.csv
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Sensitive data
+*.credentials
+.env
+secrets.json
+
+# Module publishing
+*.nupkg
+
+# Temporary files
+temp/
+tmp/
+*.tmp
