@@ -506,7 +506,7 @@ OPTION 3: Use baseline comparison (no dependencies required):
                                     }
                                     else {
                                         $comparison.Status = "Mismatch"
-                                        $comparison.Details = "Expected: $target:$port, Got: $($actual.NameTarget):$($actual.Port)"
+                                        $comparison.Details = "Expected: ${target}:${port}, Got: $($actual.NameTarget):$($actual.Port)"
                                     }
                                 }
                                 else {
